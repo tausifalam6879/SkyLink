@@ -38,7 +38,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: skylink-web
-        run: npm ci
+        run: npm install
 
       - name: Build frontend
         working-directory: skylink-web
