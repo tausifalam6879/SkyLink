@@ -30,7 +30,7 @@ The frontend preview is deployed with GitHub Pages:
 https://tausifalam6879.github.io/SkyLink/
 ```
 
-This hosted demo is useful for quickly viewing the SkyLink interface, pages, navigation, offers, trip planning, group booking UI, fare alerts, and flight status UI. Database-backed actions such as real login, OTP verification, flight search, seat availability, booking creation, booking history, and cancellation require the Spring Boot backend and MySQL database.
+This hosted demo is useful for quickly viewing the SkyLink interface, pages, navigation, offers, trip planning, group booking UI, fare alerts, and flight status UI. It also includes a browser-based demo API so visitors can search sample flights, log in with any email/password, use any OTP value, select demo seats, create demo bookings, view My Bookings, and cancel demo bookings. Real database-backed actions such as production login, SMTP OTP delivery, server-side seat locking, and shared persistent booking history require the Spring Boot backend and MySQL database.
 
 ### Local Full-Stack Demo
 

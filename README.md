@@ -11,7 +11,7 @@ Repository: [https://github.com/tausifalam6879/SkyLink](https://github.com/tausi
 
 Live demo: [https://tausifalam6879.github.io/SkyLink/](https://tausifalam6879.github.io/SkyLink/)
 
-The live demo is a GitHub Pages frontend preview. Static pages, navigation, offers, fare alerts, trip planning, group booking UI, flight status UI, and the core interface can be viewed directly in the browser. Dynamic operations such as real login, OTP, flight search from the database, seat locking, and booking creation require the Spring Boot API and MySQL database to be running locally or deployed separately.
+The live demo is a GitHub Pages frontend preview with a browser-based demo API. Visitors can search sample flights, log in with any email/password, choose demo seats, create demo bookings, view My Bookings, and cancel demo bookings. Real database-backed login, OTP email delivery, flight inventory, and persistent booking data require the Spring Boot API and MySQL database to be running locally or deployed separately.
 
 ## What This Project Does
 
@@ -55,6 +55,12 @@ Demo URL:
 What works in the hosted frontend preview:
 
 - Home page and navigation.
+- Demo flight search with sample airline data.
+- Demo login with any email/password.
+- Demo OTP flow with any OTP value.
+- Demo seat map.
+- Demo booking confirmation.
+- Demo My Bookings and cancellation using browser storage.
 - Offers and offer details.
 - Fare alert UI.
 - Group booking UI.
@@ -65,16 +71,13 @@ What works in the hosted frontend preview:
 
 What needs the backend:
 
-- Real user registration.
-- Real login and JWT token creation.
-- OTP email delivery and verification.
-- Database-backed airport search.
-- Database-backed flight search.
-- Seat availability.
-- Booking creation.
-- Booking history.
-- Booking cancellation.
-- User profile API.
+- Real production user registration.
+- Real JWT login against the database.
+- OTP email delivery and verification through SMTP.
+- Database-backed airport and flight inventory.
+- Server-side seat locking.
+- Persistent booking history shared across devices.
+- Production user profile API.
 
 For the complete working system, run the backend and frontend locally using the quick start below.
 

@@ -1,12 +1,22 @@
 import axios from "axios";
+import { demoAdapter } from "./demoApi";
 import { getToken, logout } from "../utils/auth";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   "http://localhost:8081/api";
 
+const DEMO_API_ENABLED =
+  import.meta.env.VITE_DEMO_MODE === "true" ||
+  (
+    typeof window !== "undefined" &&
+    window.location.hostname.endsWith("github.io") &&
+    !import.meta.env.VITE_API_BASE_URL
+  );
+
 const api = axios.create({
   baseURL: API_BASE_URL,
+  adapter: DEMO_API_ENABLED ? demoAdapter : undefined,
   headers: {
     "Content-Type": "application/json",
   },

@@ -44,6 +44,7 @@ jobs:
         working-directory: skylink-web
         env:
           VITE_BASE_PATH: /SkyLink/
+          VITE_DEMO_MODE: "true"
         run: npm run build
 
       - name: Support client-side routing
