@@ -1,0 +1,39 @@
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+**/.codex-*.log
+**/.codex-*.out.log
+**/.codex-*.err.log
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+application-local.yaml
+application-local.yml
+
+# Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Java / Maven
+target/
+build/
+.mvn/wrapper/maven-wrapper.jar
+
+# Generated archives and temporary files
+*.zip
+*.tar
+*.tar.gz
+tmp/
+temp/

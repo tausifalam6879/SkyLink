@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: skylink-api
+
+  datasource:
+    url: ${SKYLINK_DB_URL}
+    username: ${SKYLINK_DB_USERNAME}
+    password: ${SKYLINK_DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    open-in-view: false
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${SKYLINK_MAIL_USERNAME}
+    password: ${SKYLINK_MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
+server:
+  port: 8081
+
+jwt:
+  secret: ${SKYLINK_JWT_SECRET}
+  expiration: 86400000
