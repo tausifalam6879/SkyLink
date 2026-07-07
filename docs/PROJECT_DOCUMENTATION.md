@@ -22,9 +22,19 @@ The project is built to demonstrate:
 
 ## 3. Live Demo
 
-### Local Live Demo
+### Hosted Frontend Demo
 
-The project currently supports a local live demo.
+The frontend preview is deployed with GitHub Pages:
+
+```text
+https://tausifalam6879.github.io/SkyLink/
+```
+
+This hosted demo is useful for quickly viewing the SkyLink interface, pages, navigation, offers, trip planning, group booking UI, fare alerts, and flight status UI. Database-backed actions such as real login, OTP verification, flight search, seat availability, booking creation, booking history, and cancellation require the Spring Boot backend and MySQL database.
+
+### Local Full-Stack Demo
+
+Run the project locally to use the complete frontend, backend, and database flow.
 
 Backend:
 
@@ -54,11 +64,10 @@ Open:
 http://localhost:5173
 ```
 
-### Hosted Demo Deployment Plan
+### Backend Deployment Plan
 
-A hosted demo can be created with this deployment setup:
+To make the hosted demo fully dynamic, deploy the backend with this setup:
 
-- Frontend: Vercel, Netlify, or GitHub Pages.
 - Backend: Render, Railway, AWS Elastic Beanstalk, Azure App Service, or any Java 21 compatible host.
 - Database: Managed MySQL from Railway, PlanetScale, AWS RDS, Azure Database for MySQL, or another MySQL-compatible provider.
 - Environment variables: configure all backend secrets on the hosting provider and set `VITE_API_BASE_URL` for the frontend build.
@@ -559,7 +568,7 @@ Configure all backend environment variables in the hosting dashboard. Connect th
 
 ## 18. Current Limitations
 
-- No public hosted demo URL is configured yet.
+- The public GitHub Pages demo is currently a frontend preview; full dynamic behavior requires a deployed backend and database.
 - Backend tests currently require a running MySQL-compatible database.
 - Production-grade payment gateway integration is not included.
 - Admin UI for managing aircraft, routes, schedules, and fares is not yet separated from the API layer.
