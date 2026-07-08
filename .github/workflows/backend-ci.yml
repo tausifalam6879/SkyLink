@@ -1,0 +1,38 @@
+name: Test SkyLink Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "services/skylink-api/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "services/skylink-api/**"
+      - ".github/workflows/backend-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Run backend tests
+        working-directory: services/skylink-api
+        run: |
+          chmod +x mvnw
+          ./mvnw test
