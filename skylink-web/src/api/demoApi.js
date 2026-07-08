@@ -11,6 +11,9 @@ const airports = [
     city: "Delhi",
     country: "India",
     countryCode: "IN",
+    aliases: ["New Delhi", "NCR"],
+    latitude: 28.5562,
+    longitude: 77.1,
   },
   {
     id: 2,
@@ -20,6 +23,9 @@ const airports = [
     city: "Mumbai",
     country: "India",
     countryCode: "IN",
+    aliases: ["Bombay"],
+    latitude: 19.0896,
+    longitude: 72.8656,
   },
   {
     id: 3,
@@ -29,6 +35,9 @@ const airports = [
     city: "Bengaluru",
     country: "India",
     countryCode: "IN",
+    aliases: ["Bangalore"],
+    latitude: 13.1986,
+    longitude: 77.7066,
   },
   {
     id: 4,
@@ -38,6 +47,9 @@ const airports = [
     city: "Hyderabad",
     country: "India",
     countryCode: "IN",
+    aliases: [],
+    latitude: 17.24,
+    longitude: 78.4294,
   },
   {
     id: 5,
@@ -47,6 +59,9 @@ const airports = [
     city: "Kolkata",
     country: "India",
     countryCode: "IN",
+    aliases: ["Calcutta"],
+    latitude: 22.6547,
+    longitude: 88.4467,
   },
   {
     id: 6,
@@ -56,6 +71,81 @@ const airports = [
     city: "Chennai",
     country: "India",
     countryCode: "IN",
+    aliases: ["Madras"],
+    latitude: 12.9941,
+    longitude: 80.1709,
+  },
+  {
+    id: 7,
+    iataCode: "LHR",
+    icaoCode: "EGLL",
+    airportName: "Heathrow Airport",
+    city: "London",
+    country: "United Kingdom",
+    countryCode: "GB",
+    aliases: ["LON", "Heathrow", "UK"],
+    latitude: 51.47,
+    longitude: -0.4543,
+  },
+  {
+    id: 8,
+    iataCode: "LGW",
+    icaoCode: "EGKK",
+    airportName: "Gatwick Airport",
+    city: "London",
+    country: "United Kingdom",
+    countryCode: "GB",
+    aliases: ["LON", "Gatwick", "UK"],
+    latitude: 51.1537,
+    longitude: -0.1821,
+  },
+  {
+    id: 9,
+    iataCode: "JFK",
+    icaoCode: "KJFK",
+    airportName: "John F. Kennedy International Airport",
+    city: "New York",
+    country: "United States",
+    countryCode: "US",
+    aliases: ["NYC", "New York City", "Kennedy", "USA"],
+    latitude: 40.6413,
+    longitude: -73.7781,
+  },
+  {
+    id: 10,
+    iataCode: "EWR",
+    icaoCode: "KEWR",
+    airportName: "Newark Liberty International Airport",
+    city: "New York",
+    country: "United States",
+    countryCode: "US",
+    aliases: ["NYC", "Newark", "New Jersey", "USA"],
+    latitude: 40.6895,
+    longitude: -74.1745,
+  },
+  {
+    id: 11,
+    iataCode: "DXB",
+    icaoCode: "OMDB",
+    airportName: "Dubai International Airport",
+    city: "Dubai",
+    country: "United Arab Emirates",
+    countryCode: "AE",
+    aliases: ["UAE"],
+    latitude: 25.2532,
+    longitude: 55.3657,
+  },
+  {
+    id: 12,
+    iataCode: "SIN",
+    icaoCode: "WSSS",
+    airportName: "Singapore Changi Airport",
+    city: "Singapore",
+    country: "Singapore",
+    countryCode: "SG",
+    aliases: ["Changi"],
+    latitude: 1.3644,
+    longitude: 103.9915,
   },
 ];
 
@@ -164,7 +254,83 @@ const getRouteDistance = (sourceIataCode, destinationIataCode) => {
   const forwardKey = `${sourceIataCode}-${destinationIataCode}`;
   const reverseKey = `${destinationIataCode}-${sourceIataCode}`;
 
-  return routeDistances[forwardKey] || routeDistances[reverseKey] || 900;
+  if (routeDistances[forwardKey] || routeDistances[reverseKey]) {
+    return routeDistances[forwardKey] || routeDistances[reverseKey];
+  }
+
+  const source = findAirport(sourceIataCode);
+  const destination = findAirport(destinationIataCode);
+  const hasCoordinates = (airport) =>
+    Number.isFinite(airport?.latitude) && Number.isFinite(airport?.longitude);
+
+  if (!hasCoordinates(source) || !hasCoordinates(destination)) {
+    return 900;
+  }
+
+  const toRadians = (degrees) => (degrees * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const latitudeDistance = toRadians(destination.latitude - source.latitude);
+  const longitudeDistance = toRadians(destination.longitude - source.longitude);
+  const sourceLatitude = toRadians(source.latitude);
+  const destinationLatitude = toRadians(destination.latitude);
+  const haversine =
+    Math.sin(latitudeDistance / 2) ** 2 +
+    Math.cos(sourceLatitude) *
+      Math.cos(destinationLatitude) *
+      Math.sin(longitudeDistance / 2) ** 2;
+
+  return Math.round(
+    earthRadiusKm *
+      2 *
+      Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+  );
+};
+
+const getAirportSearchText = (airport) =>
+  [
+    airport.iataCode,
+    airport.icaoCode,
+    airport.airportName,
+    airport.city,
+    airport.country,
+    airport.countryCode,
+    ...(airport.aliases || []),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+const scoreAirportSearch = (airport, query) => {
+  const normalizedQuery = query.toLowerCase();
+  const iataCode = airport.iataCode.toLowerCase();
+  const city = airport.city.toLowerCase();
+  const aliases = (airport.aliases || []).map((alias) => alias.toLowerCase());
+  const searchText = getAirportSearchText(airport);
+
+  if (iataCode === normalizedQuery) {
+    return 0;
+  }
+
+  if (aliases.includes(normalizedQuery)) {
+    return 1;
+  }
+
+  if (city === normalizedQuery) {
+    return 2;
+  }
+
+  if (city.startsWith(normalizedQuery) || iataCode.startsWith(normalizedQuery)) {
+    return 3;
+  }
+
+  if (aliases.some((alias) => alias.startsWith(normalizedQuery))) {
+    return 4;
+  }
+
+  if (searchText.includes(normalizedQuery)) {
+    return 5;
+  }
+
+  return Number.POSITIVE_INFINITY;
 };
 
 const toIsoLocalDateTime = (date, time) => {
@@ -450,18 +616,20 @@ export const demoAdapter = async (config) => {
 
   if (method === "get" && path === "/airports/search") {
     const query = String(params.query || "").trim().toLowerCase();
-    const data = airports.filter((airport) =>
-      [
-        airport.iataCode,
-        airport.icaoCode,
-        airport.airportName,
-        airport.city,
-        airport.country,
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query)
-    );
+    const data = airports
+      .map((airport) => ({
+        airport,
+        score: scoreAirportSearch(airport, query),
+      }))
+      .filter(({ score }) => Number.isFinite(score))
+      .sort((first, second) => {
+        if (first.score !== second.score) {
+          return first.score - second.score;
+        }
+
+        return first.airport.city.localeCompare(second.airport.city);
+      })
+      .map(({ airport }) => airport);
 
     return demoResponse(config, data);
   }
