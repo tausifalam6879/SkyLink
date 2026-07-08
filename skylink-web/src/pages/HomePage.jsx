@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRightLeft,
   Bell,
@@ -111,6 +111,14 @@ const utilityTiles = [
     label: "Watch prices",
   },
 ];
+
+const sortSummaries = {
+  recommended:
+    "Smart sort balances fare, travel time, departure comfort and seat availability.",
+  price: "Flights are sorted from lowest fare to highest fare.",
+  duration: "Flights are sorted by the shortest total journey time.",
+  departure: "Flights are sorted by the earliest departure time.",
+};
 
 const getDateAfterDays = (days) => {
   const date = new Date();
@@ -403,6 +411,30 @@ function HomePage() {
         (flight) => flight.fares.length > 0
       );
 
+    const getAvailableSeats = (flight) =>
+      Math.max(
+        0,
+        ...(flight.fares || []).map((fare) =>
+          Number(fare.availableSeats) || 0
+        )
+      );
+
+    const getRecommendedScore = (flight) => {
+      const departure = new Date(flight.departureTime);
+      const departureHour = Number.isNaN(departure.getTime())
+        ? 12
+        : departure.getHours();
+      const fareScore = Number.isFinite(flight.lowestFare)
+        ? flight.lowestFare * 0.7
+        : (highestFare || 0) * 0.7;
+      const durationScore =
+        (Number(flight.estimatedDurationMinutes) || 0) * 8;
+      const comfortTimePenalty = Math.abs(departureHour - 10) * 280;
+      const seatBoost = getAvailableSeats(flight) * 45;
+
+      return fareScore + durationScore + comfortTimePenalty - seatBoost;
+    };
+
     return [...withFilteredFares].sort(
       (firstFlight, secondFlight) => {
         if (sortBy === "price") {
@@ -431,8 +463,8 @@ function HomePage() {
         }
 
         return (
-          firstFlight.lowestFare -
-          secondFlight.lowestFare
+          getRecommendedScore(firstFlight) -
+          getRecommendedScore(secondFlight)
         );
       }
     );
@@ -1016,8 +1048,18 @@ function HomePage() {
     navigate("/");
   };
 
-  const handleUtilityNavigation = (path) => {
+  const handleUtilityNavigation = (event, path, title) => {
+    sessionStorage.setItem(
+      "skylink_last_utility_action",
+      JSON.stringify({
+        title,
+        path,
+        openedAt: new Date().toISOString(),
+      })
+    );
+
     if (path.startsWith("#")) {
+      event.preventDefault();
       document
         .querySelector(path)
         ?.scrollIntoView({
@@ -1027,8 +1069,6 @@ function HomePage() {
 
       return;
     }
-
-    navigate(path);
   };
 
   const getUserDisplayName = () => {
@@ -1649,17 +1689,24 @@ function HomePage() {
             <div className="utility-tile-grid">
               {utilityTiles.map(
                 ({ title, path, Icon, label }) => (
-                  <button
-                    type="button"
+                  <Link
                     key={title}
-                    onClick={() =>
-                      handleUtilityNavigation(path)
+                    to={path}
+                    state={{
+                      fromUtility: title,
+                    }}
+                    onClick={(event) =>
+                      handleUtilityNavigation(
+                        event,
+                        path,
+                        title
+                      )
                     }
                   >
                     <Icon size={26} />
                     <strong>{title}</strong>
                     <span>{label}</span>
-                  </button>
+                  </Link>
                 )
               )}
             </div>
@@ -1753,66 +1800,75 @@ function HomePage() {
 
                 {flights.length > 0 && (
                   <div className="results-tools">
-                    <div className="sort-tabs">
-                      <button
-                        type="button"
-                        className={
-                          sortBy === "recommended"
-                            ? "active"
-                            : ""
-                        }
-                        onClick={() =>
-                          setSortBy("recommended")
-                        }
-                      >
-                        Smart
-                        <span>Recommended</span>
-                      </button>
+                    <div className="sort-panel">
+                      <div className="sort-tabs">
+                        <button
+                          type="button"
+                          className={
+                            sortBy === "recommended"
+                              ? "active"
+                              : ""
+                          }
+                          onClick={() =>
+                            setSortBy("recommended")
+                          }
+                        >
+                          Smart
+                          <span>Recommended</span>
+                        </button>
 
-                      <button
-                        type="button"
-                        className={
-                          sortBy === "price"
-                            ? "active"
-                            : ""
-                        }
-                        onClick={() =>
-                          setSortBy("price")
-                        }
-                      >
-                        Price
-                        <span>Low to High</span>
-                      </button>
+                        <button
+                          type="button"
+                          className={
+                            sortBy === "price"
+                              ? "active"
+                              : ""
+                          }
+                          onClick={() =>
+                            setSortBy("price")
+                          }
+                        >
+                          Price
+                          <span>Low to High</span>
+                        </button>
 
-                      <button
-                        type="button"
-                        className={
-                          sortBy === "duration"
-                            ? "active"
-                            : ""
-                        }
-                        onClick={() =>
-                          setSortBy("duration")
-                        }
-                      >
-                        Fastest
-                        <span>Shortest First</span>
-                      </button>
+                        <button
+                          type="button"
+                          className={
+                            sortBy === "duration"
+                              ? "active"
+                              : ""
+                          }
+                          onClick={() =>
+                            setSortBy("duration")
+                          }
+                        >
+                          Fastest
+                          <span>Shortest First</span>
+                        </button>
 
-                      <button
-                        type="button"
-                        className={
-                          sortBy === "departure"
-                            ? "active"
-                            : ""
-                        }
-                        onClick={() =>
-                          setSortBy("departure")
-                        }
+                        <button
+                          type="button"
+                          className={
+                            sortBy === "departure"
+                              ? "active"
+                              : ""
+                          }
+                          onClick={() =>
+                            setSortBy("departure")
+                          }
+                        >
+                          Departure
+                          <span>Earliest First</span>
+                        </button>
+                      </div>
+
+                      <p
+                        className="sort-feedback"
+                        role="status"
                       >
-                        Departure
-                        <span>Earliest First</span>
-                      </button>
+                        {sortSummaries[sortBy]}
+                      </p>
                     </div>
 
                     <div className="filter-panel">

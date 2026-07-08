@@ -144,6 +144,7 @@ function TripPlannerPage() {
   const [selectedWeather, setSelectedWeather] = useState([]);
   const [selectedDestination, setSelectedDestination] = useState(null);
   const [aiShortlistOpen, setAiShortlistOpen] = useState(false);
+  const [aiPlanMessage, setAiPlanMessage] = useState("");
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
 
@@ -205,10 +206,39 @@ function TripPlannerPage() {
     setSelectedWeather([]);
     setSelectedDestination(null);
     setAiShortlistOpen(false);
+    setAiPlanMessage("");
   };
 
   const chooseDestination = (destination) => {
     setSelectedDestination(destination);
+
+    if (aiShortlistOpen) {
+      setAiPlanMessage(
+        `${destination.name} selected for your ${month} trip from ${
+          origin || "your city"
+        }.`
+      );
+    }
+  };
+
+  const createAiTrip = () => {
+    setAiShortlistOpen(true);
+
+    if (aiShortlist.length === 0) {
+      setSelectedDestination(null);
+      setAiPlanMessage(
+        "No AI shortlist available for these filters. Clear a filter or increase budget."
+      );
+      return;
+    }
+
+    const topPick = aiShortlist[0];
+    setSelectedDestination(topPick);
+    setAiPlanMessage(
+      `AI picked ${topPick.name} from ${origin || "your city"} for ${month} under ${formatPrice(
+        budget
+      )}.`
+    );
   };
 
   const bookDestination = (destination) => {
@@ -375,11 +405,18 @@ function TripPlannerPage() {
             <button
               type="button"
               className="planner-ai-button"
-              onClick={() => setAiShortlistOpen((current) => !current)}
+              aria-pressed={aiShortlistOpen}
+              onClick={createAiTrip}
             >
               <Wand2 size={18} />
               Create trip with AI
             </button>
+
+            {aiPlanMessage && (
+              <p className="planner-ai-message" role="status">
+                {aiPlanMessage}
+              </p>
+            )}
           </div>
 
           <div className="category-tabs planner-category-tabs">
@@ -415,20 +452,35 @@ function TripPlannerPage() {
           {aiShortlistOpen && (
             <div className="ai-shortlist-panel">
               <strong>Smart shortlist</strong>
-              <div>
-                {aiShortlist.map((destination) => (
+              {aiShortlist.length > 0 ? (
+                <div>
+                  {aiShortlist.map((destination) => (
+                    <button
+                      type="button"
+                      key={destination.name}
+                      onClick={() => chooseDestination(destination)}
+                    >
+                      {destination.name}
+                      <span>
+                        {formatPrice(destination.flightPrice)} flight
+                      </span>
+                    </button>
+                  ))}
+
                   <button
                     type="button"
-                    key={destination.name}
-                    onClick={() => chooseDestination(destination)}
+                    className="ai-book-button"
+                    onClick={() => bookDestination(aiShortlist[0])}
                   >
-                    {destination.name}
-                    <span>
-                      {formatPrice(destination.flightPrice)} flight
-                    </span>
+                    Book top suggestion
+                    <span>{aiShortlist[0].name}</span>
                   </button>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <p>
+                  No trip ideas match these filters. Try clearing a filter.
+                </p>
+              )}
             </div>
           )}
 

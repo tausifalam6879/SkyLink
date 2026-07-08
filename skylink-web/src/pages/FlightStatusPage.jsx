@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -57,8 +57,24 @@ const statusSamples = [
   },
 ];
 
+const normalizeCode = (value) =>
+  value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+const formatTrackerDate = (value) => {
+  if (!value) {
+    return "selected date";
+  }
+
+  return new Date(`${value}T00:00:00`).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
 function FlightStatusPage() {
   const navigate = useNavigate();
+  const resultRef = useRef(null);
 
   const [activeTab, setActiveTab] = useState("flight");
   const [flightNumber, setFlightNumber] = useState("");
@@ -71,6 +87,7 @@ function FlightStatusPage() {
     new Date().toISOString().split("T")[0]
   );
   const [searched, setSearched] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
 
   const filteredAirlines = useMemo(() => {
     const normalized = airlineQuery.trim().toLowerCase();
@@ -119,14 +136,27 @@ function FlightStatusPage() {
       };
     }
 
-    const routeQuery = `${source.trim()} to ${destination.trim()}`.toUpperCase();
+    const normalizedSource = source.trim().toUpperCase();
+    const normalizedDestination = destination.trim().toUpperCase();
+    const routeQuery = normalizeCode(
+      `${normalizedSource} to ${normalizedDestination}`
+    );
 
     return (
-      statusSamples.find((item) => item.route.toUpperCase().includes(routeQuery)) ||
+      statusSamples.find((item) =>
+        normalizeCode(item.route).includes(routeQuery)
+      ) ||
       {
         ...statusSamples[1],
-        route: `${source || "DEL"} to ${destination || "BOM"}`,
+        route: `${normalizedSource || "DEL"} to ${
+          normalizedDestination || "BOM"
+        }`,
+        flightNumber: selectedAirline
+          ? `${selectedAirline.code} 418`
+          : "SL 418",
         airline: selectedAirline?.name || "SkyLink Air",
+        status: "Tracking",
+        progress: 44,
       }
     );
   }, [
@@ -144,15 +174,57 @@ function FlightStatusPage() {
     setAirlineOpen(false);
   };
 
+  const changeTab = (tab) => {
+    setActiveTab(tab);
+    setStatusMessage("");
+
+    if (tab === "route") {
+      setSource((current) => current || "DEL");
+      setDestination((current) => current || "BOM");
+    }
+  };
+
+  const revealResult = () => {
+    window.setTimeout(() => {
+      resultRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      resultRef.current?.focus({ preventScroll: true });
+    }, 0);
+  };
+
+  const getSearchMessage = () => {
+    const dateLabel = formatTrackerDate(travelDate);
+
+    if (activeTab === "flight") {
+      return `Showing live status for ${flightNumber.trim().toUpperCase()} on ${dateLabel}.`;
+    }
+
+    if (activeTab === "scheduled") {
+      return `Showing ${selectedAirline?.name || "selected airline"} schedule on ${dateLabel}.`;
+    }
+
+    return `Showing live status for ${source.trim().toUpperCase()} to ${destination
+      .trim()
+      .toUpperCase()} on ${dateLabel}.`;
+  };
+
   const handleSearch = (event) => {
     event.preventDefault();
     setSearched(true);
+    setStatusMessage(getSearchMessage());
+    revealResult();
   };
 
   const focusAirline = (airline) => {
     setActiveTab("scheduled");
     selectAirline(airline);
     setSearched(true);
+    setStatusMessage(
+      `Showing ${airline.name} schedule on ${formatTrackerDate(travelDate)}.`
+    );
+    revealResult();
   };
 
   return (
@@ -206,7 +278,7 @@ function FlightStatusPage() {
                     type="button"
                     className={activeTab === tab ? "active" : ""}
                     key={tab}
-                    onClick={() => setActiveTab(tab)}
+                    onClick={() => changeTab(tab)}
                   >
                     {label}
                   </button>
@@ -235,7 +307,9 @@ function FlightStatusPage() {
                     <span>From</span>
                     <input
                       value={source}
-                      onChange={(event) => setSource(event.target.value)}
+                      onChange={(event) =>
+                        setSource(event.target.value.toUpperCase())
+                      }
                       placeholder="DEL"
                       required
                     />
@@ -246,7 +320,9 @@ function FlightStatusPage() {
                     <span>To</span>
                     <input
                       value={destination}
-                      onChange={(event) => setDestination(event.target.value)}
+                      onChange={(event) =>
+                        setDestination(event.target.value.toUpperCase())
+                      }
                       placeholder="BOM"
                       required
                     />
@@ -307,9 +383,19 @@ function FlightStatusPage() {
                 <Search size={18} />
                 Check status
               </button>
+
+              {statusMessage && (
+                <p className="status-search-feedback" role="status">
+                  {statusMessage}
+                </p>
+              )}
             </form>
 
-            <article className="status-result-card">
+            <article
+              className={`status-result-card ${searched ? "searched" : ""}`}
+              ref={resultRef}
+              tabIndex={-1}
+            >
               <div className="status-chip">{matchedStatus.status}</div>
 
               <div className="status-flight-head">
@@ -330,6 +416,12 @@ function FlightStatusPage() {
                   <Clock3 size={18} />
                   <span>Departure</span>
                   <strong>{matchedStatus.departure}</strong>
+                </div>
+
+                <div>
+                  <CalendarDays size={18} />
+                  <span>Date</span>
+                  <strong>{formatTrackerDate(travelDate)}</strong>
                 </div>
 
                 <div>
