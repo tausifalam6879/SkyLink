@@ -1,153 +1,9 @@
 const DEMO_BOOKINGS_KEY = "skylink_demo_bookings";
 const DEMO_PROFILE_KEY = "skylink_demo_profile";
 const SELECTED_BOOKING_KEY = "skylink_selected_booking";
+const AIRPORT_DATA_PATH = `${import.meta.env?.BASE_URL || "/"}data/airports.json`;
 
-const airports = [
-  {
-    id: 1,
-    iataCode: "DEL",
-    icaoCode: "VIDP",
-    airportName: "Indira Gandhi International Airport",
-    city: "Delhi",
-    country: "India",
-    countryCode: "IN",
-    aliases: ["New Delhi", "NCR"],
-    latitude: 28.5562,
-    longitude: 77.1,
-  },
-  {
-    id: 2,
-    iataCode: "BOM",
-    icaoCode: "VABB",
-    airportName: "Chhatrapati Shivaji Maharaj International Airport",
-    city: "Mumbai",
-    country: "India",
-    countryCode: "IN",
-    aliases: ["Bombay"],
-    latitude: 19.0896,
-    longitude: 72.8656,
-  },
-  {
-    id: 3,
-    iataCode: "BLR",
-    icaoCode: "VOBL",
-    airportName: "Kempegowda International Airport",
-    city: "Bengaluru",
-    country: "India",
-    countryCode: "IN",
-    aliases: ["Bangalore"],
-    latitude: 13.1986,
-    longitude: 77.7066,
-  },
-  {
-    id: 4,
-    iataCode: "HYD",
-    icaoCode: "VOHS",
-    airportName: "Rajiv Gandhi International Airport",
-    city: "Hyderabad",
-    country: "India",
-    countryCode: "IN",
-    aliases: [],
-    latitude: 17.24,
-    longitude: 78.4294,
-  },
-  {
-    id: 5,
-    iataCode: "CCU",
-    icaoCode: "VECC",
-    airportName: "Netaji Subhas Chandra Bose International Airport",
-    city: "Kolkata",
-    country: "India",
-    countryCode: "IN",
-    aliases: ["Calcutta"],
-    latitude: 22.6547,
-    longitude: 88.4467,
-  },
-  {
-    id: 6,
-    iataCode: "MAA",
-    icaoCode: "VOMM",
-    airportName: "Chennai International Airport",
-    city: "Chennai",
-    country: "India",
-    countryCode: "IN",
-    aliases: ["Madras"],
-    latitude: 12.9941,
-    longitude: 80.1709,
-  },
-  {
-    id: 7,
-    iataCode: "LHR",
-    icaoCode: "EGLL",
-    airportName: "Heathrow Airport",
-    city: "London",
-    country: "United Kingdom",
-    countryCode: "GB",
-    aliases: ["LON", "Heathrow", "UK"],
-    latitude: 51.47,
-    longitude: -0.4543,
-  },
-  {
-    id: 8,
-    iataCode: "LGW",
-    icaoCode: "EGKK",
-    airportName: "Gatwick Airport",
-    city: "London",
-    country: "United Kingdom",
-    countryCode: "GB",
-    aliases: ["LON", "Gatwick", "UK"],
-    latitude: 51.1537,
-    longitude: -0.1821,
-  },
-  {
-    id: 9,
-    iataCode: "JFK",
-    icaoCode: "KJFK",
-    airportName: "John F. Kennedy International Airport",
-    city: "New York",
-    country: "United States",
-    countryCode: "US",
-    aliases: ["NYC", "New York City", "Kennedy", "USA"],
-    latitude: 40.6413,
-    longitude: -73.7781,
-  },
-  {
-    id: 10,
-    iataCode: "EWR",
-    icaoCode: "KEWR",
-    airportName: "Newark Liberty International Airport",
-    city: "New York",
-    country: "United States",
-    countryCode: "US",
-    aliases: ["NYC", "Newark", "New Jersey", "USA"],
-    latitude: 40.6895,
-    longitude: -74.1745,
-  },
-  {
-    id: 11,
-    iataCode: "DXB",
-    icaoCode: "OMDB",
-    airportName: "Dubai International Airport",
-    city: "Dubai",
-    country: "United Arab Emirates",
-    countryCode: "AE",
-    aliases: ["UAE"],
-    latitude: 25.2532,
-    longitude: 55.3657,
-  },
-  {
-    id: 12,
-    iataCode: "SIN",
-    icaoCode: "WSSS",
-    airportName: "Singapore Changi Airport",
-    city: "Singapore",
-    country: "Singapore",
-    countryCode: "SG",
-    aliases: ["Changi"],
-    latitude: 1.3644,
-    longitude: 103.9915,
-  },
-];
+let airportDataPromise;
 
 const routeDistances = {
   "DEL-BOM": 1148,
@@ -243,14 +99,28 @@ const normalizePath = (url = "") => {
   return url.split("?")[0].replace(/^\/api/, "") || "/";
 };
 
-const findAirport = (iataCode) => {
+const getDemoAirports = async () => {
+  if (!airportDataPromise) {
+    airportDataPromise = fetch(AIRPORT_DATA_PATH).then((response) => {
+      if (!response.ok) {
+        throw new Error("Unable to load demo airport data.");
+      }
+
+      return response.json();
+    });
+  }
+
+  return airportDataPromise;
+};
+
+const findAirport = (airports, iataCode) => {
   return airports.find(
     (airport) =>
       airport.iataCode === String(iataCode || "").trim().toUpperCase()
   );
 };
 
-const getRouteDistance = (sourceIataCode, destinationIataCode) => {
+const getRouteDistance = (airports, sourceIataCode, destinationIataCode) => {
   const forwardKey = `${sourceIataCode}-${destinationIataCode}`;
   const reverseKey = `${destinationIataCode}-${sourceIataCode}`;
 
@@ -258,8 +128,8 @@ const getRouteDistance = (sourceIataCode, destinationIataCode) => {
     return routeDistances[forwardKey] || routeDistances[reverseKey];
   }
 
-  const source = findAirport(sourceIataCode);
-  const destination = findAirport(destinationIataCode);
+  const source = findAirport(airports, sourceIataCode);
+  const destination = findAirport(airports, destinationIataCode);
   const hasCoordinates = (airport) =>
     Number.isFinite(airport?.latitude) && Number.isFinite(airport?.longitude);
 
@@ -286,6 +156,15 @@ const getRouteDistance = (sourceIataCode, destinationIataCode) => {
   );
 };
 
+const normalizeSearchValue = (value) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+const tokenizeSearchValue = (value) =>
+  normalizeSearchValue(value).split(/[^a-z0-9]+/).filter(Boolean);
+
 const getAirportSearchText = (airport) =>
   [
     airport.iataCode,
@@ -294,40 +173,81 @@ const getAirportSearchText = (airport) =>
     airport.city,
     airport.country,
     airport.countryCode,
-    ...(airport.aliases || []),
+    airport.keywords,
   ]
     .join(" ")
     .toLowerCase();
 
 const scoreAirportSearch = (airport, query) => {
-  const normalizedQuery = query.toLowerCase();
-  const iataCode = airport.iataCode.toLowerCase();
-  const city = airport.city.toLowerCase();
-  const aliases = (airport.aliases || []).map((alias) => alias.toLowerCase());
-  const searchText = getAirportSearchText(airport);
-
-  if (iataCode === normalizedQuery) {
-    return 0;
-  }
-
-  if (aliases.includes(normalizedQuery)) {
-    return 1;
-  }
+  const normalizedQuery = normalizeSearchValue(query);
+  const iataCode = normalizeSearchValue(airport.iataCode);
+  const icaoCode = normalizeSearchValue(airport.icaoCode);
+  const city = normalizeSearchValue(airport.city);
+  const country = normalizeSearchValue(airport.country);
+  const airportName = normalizeSearchValue(airport.airportName);
+  const countryCode = normalizeSearchValue(airport.countryCode);
+  const searchText = normalizeSearchValue(getAirportSearchText(airport));
+  const cityCountryTokens = tokenizeSearchValue(
+    [airport.city, airport.country].join(" ")
+  );
+  const tokens = tokenizeSearchValue(
+    [
+      airport.airportName,
+      airport.city,
+      airport.country,
+      airport.keywords,
+    ].join(" ")
+  );
+  const typeRank = {
+    large_airport: 0,
+    medium_airport: 1,
+    small_airport: 2,
+  }[airport.type] ?? 3;
+  const popularityBoost = Math.min(Number(airport.score) || 0, 5000000);
+  const baseRank =
+    typeRank * 10000000 +
+    (airport.scheduledService ? 0 : 5000000) -
+    popularityBoost;
+  const ranked = (category) => category * 100000000 + baseRank;
 
   if (city === normalizedQuery) {
-    return 2;
+    return ranked(0);
   }
 
-  if (city.startsWith(normalizedQuery) || iataCode.startsWith(normalizedQuery)) {
-    return 3;
+  if (country === normalizedQuery || countryCode === normalizedQuery) {
+    return ranked(1);
   }
 
-  if (aliases.some((alias) => alias.startsWith(normalizedQuery))) {
-    return 4;
+  if (cityCountryTokens.some((token) => token.startsWith(normalizedQuery))) {
+    return ranked(2);
+  }
+
+  if (iataCode === normalizedQuery) {
+    return ranked(3);
+  }
+
+  if (icaoCode === normalizedQuery) {
+    return ranked(4);
+  }
+
+  if (tokens.includes(normalizedQuery)) {
+    return ranked(5);
+  }
+
+  if (iataCode.startsWith(normalizedQuery) || icaoCode.startsWith(normalizedQuery)) {
+    return ranked(6);
+  }
+
+  if (airportName.startsWith(normalizedQuery)) {
+    return ranked(7);
+  }
+
+  if (tokens.some((token) => token.startsWith(normalizedQuery))) {
+    return ranked(8);
   }
 
   if (searchText.includes(normalizedQuery)) {
-    return 5;
+    return ranked(9);
   }
 
   return Number.POSITIVE_INFINITY;
@@ -364,12 +284,18 @@ const buildFare = (flightScheduleId, flightNumber, route, fareClass, index) => {
   };
 };
 
-const buildDemoFlights = (sourceIataCode, destinationIataCode, travelDate) => {
-  const source = findAirport(sourceIataCode) || airports[0];
-  const destination = findAirport(destinationIataCode) || airports[1];
+const buildDemoFlights = (
+  airports,
+  sourceIataCode,
+  destinationIataCode,
+  travelDate
+) => {
+  const source = findAirport(airports, sourceIataCode) || airports[0];
+  const destination = findAirport(airports, destinationIataCode) || airports[1];
   const selectedDate =
     travelDate || new Date().toISOString().slice(0, 10);
   const distanceKm = getRouteDistance(
+    airports,
     source.iataCode,
     destination.iataCode
   );
@@ -616,6 +542,7 @@ export const demoAdapter = async (config) => {
 
   if (method === "get" && path === "/airports/search") {
     const query = String(params.query || "").trim().toLowerCase();
+    const airports = await getDemoAirports();
     const data = airports
       .map((airport) => ({
         airport,
@@ -635,9 +562,12 @@ export const demoAdapter = async (config) => {
   }
 
   if (method === "post" && path === "/flights/search") {
+    const airports = await getDemoAirports();
+
     return demoResponse(
       config,
       buildDemoFlights(
+        airports,
         body.sourceIataCode,
         body.destinationIataCode,
         body.travelDate
