@@ -273,11 +273,14 @@ button:disabled {
   padding: 78px 7% 90px;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(
-    120deg,
-    rgba(5, 28, 67, 0.98),
-    rgba(6, 66, 137, 0.94)
-  );
+  background:
+    linear-gradient(
+      90deg,
+      rgba(5, 28, 67, 0.9) 0%,
+      rgba(5, 43, 91, 0.68) 48%,
+      rgba(5, 43, 91, 0.28) 100%
+    ),
+    url("./assets/travel-hero.png") center / cover no-repeat;
 }
 
 .hero::after {
@@ -1635,6 +1638,7 @@ button:disabled {
 
   .hero {
     padding: 55px 5% 70px;
+    background-position: center, 42% center;
   }
 
   .hero h2 {

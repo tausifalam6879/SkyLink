@@ -1,593 +1,286 @@
-# SkyLink Project Documentation
+# SkyLink developer notes
 
-## 1. Project Summary
+This document records how SkyLink is put together and why a few implementation choices were made. The root [README](../README.md) contains the setup commands and public project overview; this file stays closer to the code.
 
-SkyLink is a full-stack airline booking and travel management platform. It is designed as a practical web application that demonstrates how a real flight booking system can be structured across a modern frontend, secure backend API, relational database, and authenticated user workflows.
+## Scope
 
-The application allows users to explore flights, authenticate, book tickets, select seats, manage bookings, view travel offers, track flight status, request group travel, plan trips, and manage account information. The backend exposes REST APIs for domain objects such as users, airports, aircraft, routes, flight schedules, fares, seats, passengers, and bookings.
+SkyLink has two execution modes:
 
-## 2. Project Goals
+- `skylink-web` can run against the Spring Boot API;
+- the GitHub Pages build can use `demoApi.js` when no backend URL is configured.
 
-The project is built to demonstrate:
+The real API owns authentication, airport data, generated flight inventory, seats, passengers, and bookings. The demo adapter mirrors enough of that API contract to make the static deployment interactive, but its data only lives in the current browser.
 
-- A realistic full-stack airline booking workflow.
-- React-based frontend routing and protected pages.
-- Spring Boot REST API design.
-- JWT-based stateless authentication.
-- Relational data modeling with Spring Data JPA and MySQL.
-- Booking inventory handling for seats and fare availability.
-- Email/OTP-style authentication support.
-- Clean separation between controllers, services, repositories, DTOs, and entities.
-- Environment-based secret management.
+The supporting travel pages are intentionally lighter. Flight status uses sample data, and fare alerts, group-booking requests, and planner state stay in the browser. They are UI experiments rather than completed backend modules.
 
-## 3. Live Demo
+## Entry points
 
-### Hosted Frontend Demo
-
-The frontend preview is deployed with GitHub Pages:
+Frontend startup:
 
 ```text
-https://tausifalam6879.github.io/SkyLink/
+skylink-web/index.html
+    -> src/main.jsx
+    -> BrowserRouter
+    -> src/App.jsx
+    -> route page
 ```
 
-This hosted demo is useful for quickly viewing the SkyLink interface, pages, navigation, offers, trip planning, group booking UI, fare alerts, and flight status UI. It also includes a browser-based demo API so visitors can search sample flights, log in with any email/password, use any OTP value, select demo seats, create demo bookings, view My Bookings, and cancel demo bookings. Real database-backed actions such as production login, SMTP OTP delivery, server-side seat locking, and shared persistent booking history require the Spring Boot backend and MySQL database.
-
-### Local Full-Stack Demo
-
-Run the project locally to use the complete frontend, backend, and database flow.
-
-Backend:
-
-```powershell
-cd services/skylink-api
-$env:SKYLINK_DB_URL="jdbc:mysql://localhost:3306/skylink_db"
-$env:SKYLINK_DB_USERNAME="root"
-$env:SKYLINK_DB_PASSWORD="your_mysql_password"
-$env:SKYLINK_MAIL_USERNAME="your_email@gmail.com"
-$env:SKYLINK_MAIL_PASSWORD="your_gmail_app_password"
-$env:SKYLINK_JWT_SECRET="replace_with_a_long_random_secret_at_least_64_characters"
-.\mvnw.cmd spring-boot:run
-```
-
-Frontend:
-
-```powershell
-cd skylink-web
-npm install
-$env:VITE_API_BASE_URL="http://localhost:8081/api"
-npm run dev
-```
-
-Open:
+Backend startup:
 
 ```text
-http://localhost:5173
+SkylinkApiApplication
+    -> Spring component scanning
+    -> Security and repository configuration
+    -> startup importers and seeders
+    -> REST controllers
 ```
 
-### Backend Deployment Plan
+The shared frontend HTTP client is `src/api/axiosConfig.js`. It reads `VITE_API_BASE_URL`, attaches the stored JWT, and clears the browser auth state after a `401` response. The same client selects the demo adapter for the GitHub Pages build.
 
-To make the hosted demo fully dynamic, deploy the backend with this setup:
+## Backend package boundaries
 
-- Backend: Render, Railway, AWS Elastic Beanstalk, Azure App Service, or any Java 21 compatible host.
-- Database: Managed MySQL from Railway, PlanetScale, AWS RDS, Azure Database for MySQL, or another MySQL-compatible provider.
-- Environment variables: configure all backend secrets on the hosting provider and set `VITE_API_BASE_URL` for the frontend build.
+The backend uses a layered structure rather than exposing JPA entities directly from controllers.
 
-## 4. Technology Stack
-
-### Frontend
-
-- JavaScript
-- React 19
-- Vite
-- React Router
-- Axios
-- Lucide React
-- CSS
-- ESLint
-
-### Backend
-
-- Java 21
-- Spring Boot 3.5
-- Spring Web
-- Spring Security
-- Spring Data JPA
-- Bean Validation
-- Spring Mail
-- Lombok
-- JJWT
-- Apache Commons CSV
-
-### Database
-
-- MySQL
-- Hibernate ORM
-
-### Development and Build Tools
-
-- Git
-- GitHub
-- npm
-- Maven Wrapper
-- Postman-compatible REST APIs
-
-## 5. High-Level Architecture
-
-```text
-User Browser
-    |
-    | React pages, protected routes, Axios API calls
-    v
-SkyLink Web App
-    |
-    | JSON over HTTP
-    v
-Spring Boot REST API
-    |
-    | Controller -> Service -> Repository
-    v
-MySQL Database
-```
-
-The frontend and backend are separated into independent applications:
-
-- `skylink-web` contains the browser UI.
-- `services/skylink-api` contains the backend REST API.
-
-This separation allows independent development, testing, and deployment.
-
-## 6. Frontend Documentation
-
-### Frontend Responsibilities
-
-The frontend is responsible for:
-
-- Rendering the complete user interface.
-- Managing browser routes.
-- Protecting pages that require login.
-- Calling backend APIs through Axios.
-- Storing and attaching JWT tokens.
-- Redirecting unauthenticated users to login.
-- Presenting flight search, booking, account, offers, and support workflows.
-
-### Important Frontend Folders
-
-```text
-skylink-web/src/
-|-- api/
-|   `-- axiosConfig.js
-|-- data/
-|   `-- offerData.js
-|-- pages/
-|-- utils/
-|   `-- auth.js
-|-- App.jsx
-`-- main.jsx
-```
-
-### Frontend Routing
-
-The application uses React Router. Public pages include home, login, register, offers, flight status, group booking, trip planner, fare alerts, and credit card pages. Protected pages include booking, my bookings, and user dashboard.
-
-Important routes:
-
-| Route | Description |
+| Package | Responsibility |
 | --- | --- |
-| `/` | Main home and flight search page |
-| `/flights` | Flight search alias |
-| `/login` | User login |
-| `/register` | User registration |
-| `/booking` | Protected booking page |
-| `/my-bookings` | Protected user booking history |
-| `/bookings` | Protected booking history alias |
-| `/user` | Protected user dashboard |
-| `/account` | Protected account alias |
-| `/flight-status` | Flight status tracking |
-| `/group-booking` | Group travel request |
-| `/support/group` | Group travel alias |
-| `/plan` | Trip planner |
-| `/offers` | Offer listing |
-| `/offers/:offerSlug` | Offer details |
-| `/travel-credit-card` | Travel credit card page |
-| `/fare-alerts` | Fare alert page |
+| `controller` | HTTP routes, parameters, status codes, and request validation |
+| `dto` | Request and response contracts |
+| `service` | Business rules, transactions, and entity-to-DTO mapping |
+| `repository` | Spring Data queries and database locks |
+| `entity` | MySQL tables, relationships, constraints, and timestamps |
+| `config` | Security, CORS, and startup configuration |
+| `filter` | JWT extraction and request authentication |
+| `importer` | Dataset loading and generated inventory |
+| `exception` | Common error responses |
+| `util` | JWT signing and parsing |
 
-### API Client
+Constructor injection is used throughout the main services and controllers. This keeps dependencies visible and allows Spring to construct each component without service-locator calls.
 
-`src/api/axiosConfig.js` creates the shared Axios client. It:
+## Authentication notes
 
-- Reads `VITE_API_BASE_URL`.
-- Uses `http://localhost:8081/api` by default.
-- Attaches JWT tokens from local auth utilities.
-- Logs users out and redirects to `/login` when the backend returns `401`.
-
-## 7. Backend Documentation
-
-### Backend Responsibilities
-
-The backend is responsible for:
-
-- Authenticating users.
-- Hashing passwords.
-- Creating and validating JWT tokens.
-- Sending and verifying OTP flows.
-- Managing user profiles.
-- Searching airports and flights.
-- Managing aircraft, routes, schedules, fares, and seats.
-- Creating and cancelling bookings.
-- Keeping seat and fare availability consistent.
-- Returning structured DTO responses to the frontend.
-
-### Backend Package Structure
+### Password path
 
 ```text
-services/skylink-api/src/main/java/com/skylink/
-|-- config/
-|-- controller/
-|-- dto/
-|-- entity/
-|-- exception/
-|-- filter/
-|-- importer/
-|-- repository/
-|-- service/
-`-- util/
+LoginPage
+    -> POST /api/auth/login
+    -> AuthController
+    -> UserService.findByEmail
+    -> BCrypt password check
+    -> JwtUtil.generateToken
+    -> frontend saveAuth
 ```
 
-### Package Responsibilities
+Passwords are stored as BCrypt hashes. The API does not create an HTTP session; the signed JWT is sent back on every protected request as a Bearer token.
 
-| Package | Purpose |
-| --- | --- |
-| `config` | Spring Security, CORS, and application configuration |
-| `controller` | REST endpoints |
-| `dto` | Request and response models |
-| `entity` | JPA database entities |
-| `exception` | Global error handling |
-| `filter` | JWT request authentication filter |
-| `importer` | Data import and seed helpers |
-| `repository` | Spring Data JPA repositories |
-| `service` | Business logic |
-| `util` | Shared utilities such as JWT handling |
+`JwtAuthenticationFilter` reads the token subject and creates a Spring Security authentication object. The current filter assigns `ROLE_USER` to every valid token. The `role` stored on `User` therefore is not yet a complete authorization model. Inventory-management routes should receive an explicit admin policy before the API is exposed publicly.
 
-## 8. Core Backend Domains
+### OTP path
 
-### User and Authentication
+`OtpService` creates a six-digit value with `SecureRandom`. OTP records are separated by identifier, type, and purpose, which prevents a registration OTP from being used as a login or password-reset OTP.
 
-The system supports user registration, login, OTP login, forgot password, reset password, and profile retrieval. Passwords are hashed using BCrypt. JWT tokens are used for stateless authentication.
+Current controls:
 
-### Airport
+- five-minute expiry;
+- 60-second resend cooldown;
+- five failed verification attempts;
+- five resends for a matching identifier and purpose.
 
-Airport APIs support search and lookup by IATA/ICAO codes and nearby coordinates. Airport data is stored as database entities and can be seeded from bundled data files.
+Email delivery goes through Spring Mail and the Gmail SMTP configuration in `application.yaml`.
 
-### Aircraft
+There is still hardening work to do: OTP values should be stored as hashes, successful OTPs should be consumed explicitly, and the public auth endpoints need rate limiting.
 
-Aircraft APIs manage aircraft details and active aircraft lookup. Aircraft data supports flight schedule and seat generation workflows.
+## Airport data
 
-### Flight Route
+The backend imports the large `airports.csv` dataset into MySQL. `AirportRepository.searchAirports` searches active airports with usable IATA codes and ranks exact code/city matches before broad name matches. The API limits autocomplete results to 20.
 
-Flight routes connect source and destination airports. Route APIs allow route creation, resolution, and listing.
+Nearby-airport search is a native query because the distance expression is easier to express with database trigonometric functions. `AirportService` recalculates the returned distance with the Haversine formula and rounds it for the response.
 
-### Flight Schedule
+The hosted demo does not load the full CSV. `scripts/generate-frontend-airports.mjs` filters it to useful IATA airports and writes `skylink-web/public/data/airports.json`.
 
-Flight schedules represent actual flights with flight numbers, departure time, arrival time, active status, route, and aircraft associations.
+Data provenance is documented in the root README. Airport records follow the OurAirports format; airline, aircraft-type, and route records follow OpenFlights formats.
 
-### Flight Fare
+## Route, schedule, and fare model
 
-Flight fares represent fare classes, base fare, available seats, and active status for a flight schedule. Fare availability is reduced when bookings are confirmed and increased when bookings are cancelled.
+A route and a schedule are separate concepts:
 
-### Seat
+- `FlightRoute` connects a source airport to a destination airport;
+- `FlightSchedule` assigns a flight number, date/time, and aircraft to that route;
+- `FlightFare` stores price and remaining capacity for one schedule and fare class;
+- `Seat` stores the physical seat map for one schedule.
 
-Seat APIs expose seat availability by flight and fare class. Booking logic validates selected seats and marks them as booked.
+When a route is created, `FlightRouteService` calculates distance from the airport coordinates. Estimated duration uses an average speed of 800 km/h plus a 30-minute overhead. It is a scheduling approximation, not live operational data.
 
-### Booking
+`FlightScheduleService` checks whether an aircraft already has an overlapping schedule before assigning it. The overlap query looks for an existing departure before the proposed arrival and an existing arrival after the proposed departure.
 
-Booking APIs allow authenticated users to create bookings, view their bookings, get booking details by reference, and cancel bookings. Booking cancellation releases seats and restores fare availability.
+The real backend supports these fare classes:
 
-## 9. Authentication Flow
+- `ECONOMY`
+- `BUSINESS`
+- `FIRST_CLASS`
+
+The demo adapter has a separate sample model and also shows premium economy. This difference is visible in the UI but is not part of the real backend enum.
+
+## Search-time inventory generation
+
+`FlightSearchService` first searches for active `SCHEDULED` flights on the requested route and date. If it finds none, it can create inventory on demand:
+
+1. resolve or create the route;
+2. select active SkyLink aircraft whose registration begins with `VT-SLA`;
+3. calculate how many departures the route should receive;
+4. skip aircraft with an overlapping assignment;
+5. save the schedule;
+6. create fares from the aircraft's class capacities;
+7. generate the seat map.
+
+Short domestic routes receive more departure slots than long routes. The available time pool is fixed, so the generated schedules are predictable enough for a demonstration.
+
+Sample economy pricing:
 
 ```text
-User submits login/register request
-        |
-        v
-Backend validates request
-        |
-        v
-Backend creates JWT
-        |
-        v
-Frontend stores JWT
-        |
-        v
-Axios attaches Authorization header
-        |
-        v
-JwtAuthenticationFilter validates token
-        |
-        v
-Protected API request is allowed
+max(2200, 1500 + distanceKm * 4.25)
 ```
 
-Protected resources require:
+Business is `2.35` times economy and first class is `4.50` times economy. `BigDecimal` is used when the values become stored fares so money is not persisted with binary floating-point rounding.
+
+One trade-off of on-demand generation is that a read-like search request may write new schedules, fares, and seats. It keeps the demo populated without pre-generating every global route/date combination, but a production design would normally separate inventory planning from customer search.
+
+## Booking transaction
+
+The main booking path is:
 
 ```text
-Authorization: Bearer <jwt_token>
+HomePage fare selection
+    -> selected booking in localStorage
+    -> BookingPage seat request
+    -> POST /api/bookings
+    -> JwtAuthenticationFilter
+    -> BookingController
+    -> BookingService.createBooking
+    -> repositories and SeatService
+    -> BookingResponse
 ```
 
-## 10. Booking Flow
+`BookingService.createBooking` runs in a transaction. It performs the following checks and writes:
+
+1. resolve the authenticated user from `SecurityContextHolder`;
+2. load and validate the active schedule;
+3. lock the matching fare row with `PESSIMISTIC_WRITE`;
+4. verify passenger count and remaining fare capacity;
+5. reject empty, duplicate, wrong-class, or already-booked seats;
+6. calculate `baseFare * passengerCount`;
+7. save the booking and passengers;
+8. mark the seats as booked;
+9. reduce the fare's remaining capacity.
+
+The fare-row lock serializes changes for the same schedule and class. Since seat validation occurs while that lock is held, two bookings in the same class do not validate against the same stale inventory state.
+
+Cancellation also runs in a transaction. It checks ownership, locks the fare, releases each passenger seat, restores the capacity, and marks the booking and passengers inactive.
+
+The booking reference is generated from a UUID-derived value with a `SKY` prefix and checked for uniqueness before use.
+
+## Relational model
 
 ```text
-Search flights
-    |
-Select flight and fare class
-    |
-Choose passenger details and seats
-    |
-Submit booking request
-    |
-Validate authenticated user
-    |
-Validate flight schedule is active
-    |
-Lock and validate fare availability
-    |
-Validate selected seats
-    |
-Create booking reference
-    |
-Save booking and passengers
-    |
-Mark seats as booked
-    |
-Reduce available fare seats
-    |
-Return booking confirmation
+User 1 -------- N Booking
+Booking 1 ----- N Passenger
+Booking N ----- 1 FlightSchedule
+Booking N ----- 1 FlightFare
+FlightSchedule N ----- 1 FlightRoute
+FlightSchedule N ----- 1 Aircraft
+FlightRoute N -------- 1 source Airport
+FlightRoute N -------- 1 destination Airport
+FlightSchedule 1 ----- N FlightFare
+FlightSchedule 1 ----- N Seat
 ```
 
-Cancellation flow:
+Notable constraints:
 
-```text
-Find booking by reference
-    |
-Validate authenticated owner
-    |
-Release booked passenger seats
-    |
-Increase fare availability
-    |
-Mark booking as cancelled
-```
+- unique user email and mobile number;
+- unique aircraft registration;
+- unique source/destination route pair;
+- unique flight number and departure combination;
+- one fare per schedule and fare class;
+- one seat number per schedule;
+- unique booking reference.
 
-## 11. API Reference Summary
+Most `ManyToOne` relationships are lazy. With `spring.jpa.open-in-view=false`, code that needs relationship data must access it inside a service transaction or map it before leaving that boundary.
 
-### Authentication and Users
+## Startup data
 
-| Method | Endpoint | Purpose |
+Several `CommandLineRunner` components prepare development data:
+
+- airport importers load airport records;
+- `AircraftDataGenerator` builds the larger SkyLink fleet;
+- `AircraftFleetSeeder` adds a small predefined set when missing;
+- `FlightRouteDataImporter` converts valid OpenFlights route pairs;
+- `FlightScheduleDataGenerator` creates a limited seven-day startup window;
+- `SeatDataGenerator` fills missing seat maps.
+
+The startup schedule generator deliberately limits the number of routes and aircraft. Generating schedules for every imported global route would make startup slow and fill the database with inventory that may never be searched.
+
+The importer set has grown over time and could be simplified. In particular, airport and aircraft initialization should eventually have one owner each, explicit profiles, and a fully documented ordering scheme.
+
+## Frontend state and storage
+
+The frontend does not use a global state library. Page-local React state handles form inputs and API results.
+
+Browser storage is used for a few cross-page concerns:
+
+| Key/area | Storage | Reason |
 | --- | --- | --- |
-| `POST` | `/api/users/register` | Register a new user |
-| `POST` | `/api/auth/login` | Login with email and password |
-| `POST` | `/api/auth/login/otp/send` | Send login OTP |
-| `POST` | `/api/auth/login/otp/verify` | Verify login OTP |
-| `POST` | `/api/auth/forgot-password` | Start password reset |
-| `POST` | `/api/auth/reset-password` | Reset password |
-| `GET` | `/api/users/me` | Get current authenticated user |
+| JWT and cached user | `localStorage` | Keep the demo login across reloads |
+| Selected flight/fare | `localStorage` | Carry selection through login to booking |
+| Search form/results | `sessionStorage` | Restore a search within the current tab |
+| Demo bookings/profile | `localStorage` | Persist the browser-only demo |
+| Fare alerts/group requests | `localStorage` | Support UI-only features |
 
-### Flight Search and Airports
+Storing JWTs in `localStorage` keeps the client simple but exposes the token to JavaScript. An HttpOnly secure-cookie design would be preferable for a hardened deployment.
 
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `POST` | `/api/flights/search` | Search available flights |
-| `GET` | `/api/airports/search` | Search airports |
-| `GET` | `/api/airports/iata/{iataCode}` | Find airport by IATA code |
-| `GET` | `/api/airports/icao/{icaoCode}` | Find airport by ICAO code |
-| `GET` | `/api/airports/nearby` | Find nearby airports |
+## Error handling
 
-### Flight Management
+`GlobalExceptionHandler` returns a consistent `ErrorResponse` for validation, mail, runtime, and unexpected errors. The frontend reads the response message and shows it near the relevant form.
 
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `POST` | `/api/aircraft` | Create aircraft |
-| `GET` | `/api/aircraft` | List aircraft |
-| `GET` | `/api/aircraft/active` | List active aircraft |
-| `POST` | `/api/flight-routes` | Create route |
-| `POST` | `/api/flight-routes/resolve` | Resolve route |
-| `GET` | `/api/flight-routes` | List routes |
-| `POST` | `/api/flight-schedules` | Create schedule |
-| `GET` | `/api/flight-schedules` | List schedules |
-| `GET` | `/api/flight-schedules/search` | Search schedules |
-| `POST` | `/api/flight-fares` | Create fare |
-| `GET` | `/api/flight-fares` | List fares |
+The current handler maps every `RuntimeException` to `400 Bad Request`. More specific exception types should eventually distinguish authentication, authorization, missing records, and conflicts with `401`, `403`, `404`, and `409` responses.
 
-### Seats and Bookings
+## Tests
 
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/seats` | Get seat availability |
-| `POST` | `/api/bookings` | Create booking |
-| `GET` | `/api/bookings/my` | Get current user's bookings |
-| `GET` | `/api/bookings/{bookingReference}` | Get booking detail |
-| `POST` | `/api/bookings/{bookingReference}/cancel` | Cancel booking |
+The test profile uses H2 in MySQL compatibility mode and recreates the schema for the test run. `SkylinkApiApplicationTests.contextLoads` confirms that Spring can discover the components, create repositories, initialize the schema, and start the application context.
 
-## 12. Database Model Overview
+That test is intentionally small and does not prove booking correctness. The most useful next tests would cover:
 
-Important entities:
+- registration and both login paths;
+- OTP expiry, retry, and reuse cases;
+- airport search ranking;
+- search-time schedule generation;
+- two concurrent attempts to book the final seat;
+- transaction rollback after a booking failure;
+- cancellation ownership and inventory restoration.
 
-- `User`
-- `OtpVerification`
-- `Airport`
-- `Aircraft`
-- `FlightRoute`
-- `FlightSchedule`
-- `FlightFare`
-- `Seat`
-- `Booking`
-- `Passenger`
+Frontend verification currently consists of the production Vite build and ESLint. A browser-level booking test would add more confidence than snapshot-heavy component tests.
 
-Relationship overview:
+## Deployment notes
 
-```text
-User 1 -> many Bookings
-Booking 1 -> many Passengers
-Booking many -> 1 FlightSchedule
-Booking many -> 1 FlightFare
-FlightSchedule many -> 1 FlightRoute
-FlightSchedule many -> 1 Aircraft
-FlightRoute many -> 1 source Airport
-FlightRoute many -> 1 destination Airport
-FlightSchedule 1 -> many Seats
-```
+The GitHub Actions workflow builds `skylink-web` with `/SkyLink/` as its base path and enables demo mode. It copies `index.html` to `404.html` so that direct visits to client-side routes still load the React application on GitHub Pages.
 
-## 13. Environment Variables
+Running the real system publicly would additionally require:
 
-Backend:
+- a Java 21 host;
+- a managed MySQL database;
+- SMTP and JWT secrets in the host's secret store;
+- a production `VITE_API_BASE_URL`;
+- HTTPS and explicit CORS origins.
 
-| Variable | Required | Description |
-| --- | --- | --- |
-| `SKYLINK_DB_URL` | Yes | MySQL JDBC connection URL |
-| `SKYLINK_DB_USERNAME` | Yes | MySQL username |
-| `SKYLINK_DB_PASSWORD` | Yes | MySQL password |
-| `SKYLINK_MAIL_USERNAME` | Yes | SMTP username |
-| `SKYLINK_MAIL_PASSWORD` | Yes | SMTP password or Gmail app password |
-| `SKYLINK_JWT_SECRET` | Yes | Long JWT signing secret |
+## Work still open
 
-Frontend:
+The following items are deliberately described as unfinished rather than implied by the UI:
 
-| Variable | Required | Description |
-| --- | --- | --- |
-| `VITE_API_BASE_URL` | No | Backend API URL. Defaults to `http://localhost:8081/api` |
+- multi-passenger and round-trip booking;
+- payment, refunds, ticket documents, and confirmation emails;
+- admin authorization and an inventory-management interface;
+- real flight-status data;
+- server-side fare alerts and group-booking requests;
+- token refresh, auth rate limiting, and stronger OTP lifecycle rules;
+- Flyway or Liquibase migrations;
+- meaningful service, API, and concurrency test coverage.
 
-## 14. Security Design
-
-Security features:
-
-- BCrypt password hashing.
-- JWT-based stateless sessions.
-- Spring Security filter chain.
-- Protected booking and profile endpoints.
-- Request DTO validation.
-- Environment variable based secrets.
-
-Security recommendations for production:
-
-- Use HTTPS.
-- Rotate any exposed credentials.
-- Store secrets in a managed secret store.
-- Use strict CORS origins.
-- Use a managed production database user with limited permissions.
-- Add rate limiting for login and OTP endpoints.
-- Add audit logging for booking creation and cancellation.
-
-## 15. Setup Guide
-
-### Clone
-
-```powershell
-git clone https://github.com/tausifalam6879/SkyLink.git
-cd SkyLink
-```
-
-### Backend
-
-```powershell
-cd services/skylink-api
-$env:SKYLINK_DB_URL="jdbc:mysql://localhost:3306/skylink_db"
-$env:SKYLINK_DB_USERNAME="root"
-$env:SKYLINK_DB_PASSWORD="your_mysql_password"
-$env:SKYLINK_MAIL_USERNAME="your_email@gmail.com"
-$env:SKYLINK_MAIL_PASSWORD="your_gmail_app_password"
-$env:SKYLINK_JWT_SECRET="replace_with_a_long_random_secret_at_least_64_characters"
-.\mvnw.cmd spring-boot:run
-```
-
-### Frontend
-
-```powershell
-cd skylink-web
-npm install
-$env:VITE_API_BASE_URL="http://localhost:8081/api"
-npm run dev
-```
-
-## 16. Testing
-
-Frontend:
-
-```powershell
-cd skylink-web
-npm run build
-npm run lint
-```
-
-Backend:
-
-```powershell
-cd services/skylink-api
-.\mvnw.cmd test
-```
-
-The current backend test loads the Spring application context and needs valid database access because JPA and MySQL are part of the default application configuration.
-
-## 17. Deployment Notes
-
-### Frontend Deployment
-
-Use a static hosting provider:
-
-- Vercel
-- Netlify
-- GitHub Pages
-- Cloudflare Pages
-
-Build command:
-
-```text
-npm run build
-```
-
-Output directory:
-
-```text
-dist
-```
-
-Set:
-
-```text
-VITE_API_BASE_URL=https://your-api-domain.example.com/api
-```
-
-### Backend Deployment
-
-Use a Java 21 compatible hosting provider:
-
-- Render
-- Railway
-- AWS Elastic Beanstalk
-- Azure App Service
-- DigitalOcean App Platform
-
-Configure all backend environment variables in the hosting dashboard. Connect the app to a MySQL database and allow network access from the backend host.
-
-## 18. Current Limitations
-
-- The public GitHub Pages demo is currently a frontend preview; full dynamic behavior requires a deployed backend and database.
-- Backend tests currently require a running MySQL-compatible database.
-- Production-grade payment gateway integration is not included.
-- Admin UI for managing aircraft, routes, schedules, and fares is not yet separated from the API layer.
-- CORS should be tightened further before production deployment.
-
-## 19. Future Improvements
-
-- Public hosted live demo.
-- Admin dashboard for airline operations.
-- Payment gateway integration.
-- Ticket PDF generation.
-- Email ticket confirmation.
-- Advanced flight filters and sorting.
-- Role-based access control.
-- Refresh token support.
-- Docker Compose setup for frontend, backend, and MySQL.
-- CI/CD pipeline with GitHub Actions.
-- Integration tests using a test database or Testcontainers.
-
-## 20. Conclusion
-
-SkyLink is a complete full-stack project that demonstrates practical airline booking concepts with a React frontend and Spring Boot backend. It includes authentication, flight search, booking, seat handling, data import, protected user workflows, and deployment-ready configuration practices.
+These boundaries are useful when discussing the project: they separate the flows that are implemented end to end from screens that currently demonstrate a product direction.
