@@ -1,7 +1,10 @@
 const DEMO_BOOKINGS_KEY = "skylink_demo_bookings";
 const DEMO_PROFILE_KEY = "skylink_demo_profile";
+const DEMO_OTP_STORAGE_KEY = "skylink_demo_otps";
 const SELECTED_BOOKING_KEY = "skylink_selected_booking";
 const AIRPORT_DATA_PATH = `${import.meta.env?.BASE_URL || "/"}data/airports.json`;
+const DEMO_OTP_TTL_MS = 5 * 60 * 1000;
+const DEMO_OTP_MAX_ATTEMPTS = 5;
 
 let airportDataPromise;
 
@@ -93,6 +96,97 @@ const demoError = (config, message, status = 404) => {
     request: null,
     message,
   });
+};
+
+const readDemoOtpRecords = () => {
+  try {
+    return JSON.parse(sessionStorage.getItem(DEMO_OTP_STORAGE_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+};
+
+const writeDemoOtpRecords = (records) => {
+  sessionStorage.setItem(DEMO_OTP_STORAGE_KEY, JSON.stringify(records));
+};
+
+const getDemoOtpKey = (identifier, purpose) => {
+  return `${String(purpose || "REGISTRATION").toUpperCase()}:${String(
+    identifier || ""
+  )
+    .trim()
+    .toLowerCase()}`;
+};
+
+const generateDemoOtpCode = () => {
+  const randomValue = new Uint32Array(1);
+  globalThis.crypto.getRandomValues(randomValue);
+  return String(100000 + (randomValue[0] % 900000));
+};
+
+const issueDemoOtp = (identifier, purpose) => {
+  const records = readDemoOtpRecords();
+  const code = generateDemoOtpCode();
+  const expiresAt = Date.now() + DEMO_OTP_TTL_MS;
+
+  records[getDemoOtpKey(identifier, purpose)] = {
+    code,
+    expiresAt,
+    attemptsRemaining: DEMO_OTP_MAX_ATTEMPTS,
+  };
+  writeDemoOtpRecords(records);
+
+  return { code, expiresAt };
+};
+
+const verifyDemoOtp = (identifier, purpose, otpCode) => {
+  const records = readDemoOtpRecords();
+  const key = getDemoOtpKey(identifier, purpose);
+  const record = records[key];
+
+  if (!record) {
+    return {
+      verified: false,
+      message: "Pehle naya demo OTP generate karein.",
+    };
+  }
+
+  if (Date.now() >= record.expiresAt) {
+    delete records[key];
+    writeDemoOtpRecords(records);
+
+    return {
+      verified: false,
+      message: "Demo OTP expire ho gaya hai. Naya OTP generate karein.",
+    };
+  }
+
+  if (String(otpCode || "").trim() !== record.code) {
+    record.attemptsRemaining -= 1;
+
+    if (record.attemptsRemaining <= 0) {
+      delete records[key];
+      writeDemoOtpRecords(records);
+
+      return {
+        verified: false,
+        message: "Bahut zyada failed attempts. Naya demo OTP generate karein.",
+      };
+    }
+
+    records[key] = record;
+    writeDemoOtpRecords(records);
+
+    return {
+      verified: false,
+      message: `OTP sahi nahi hai. ${record.attemptsRemaining} attempts baaki hain.`,
+    };
+  }
+
+  delete records[key];
+  writeDemoOtpRecords(records);
+
+  return { verified: true };
 };
 
 const normalizePath = (url = "") => {
@@ -404,6 +498,22 @@ const saveDemoBookings = (bookings) => {
   return bookings;
 };
 
+const normalizeDemoEmail = (email) => {
+  return String(email || "").trim().toLowerCase();
+};
+
+const getCurrentDemoUserEmail = () => {
+  return normalizeDemoEmail(getDemoProfile().email);
+};
+
+const getCurrentUserDemoBookings = () => {
+  const currentUserEmail = getCurrentDemoUserEmail();
+
+  return getDemoBookings().filter(
+    (booking) => normalizeDemoEmail(booking.userEmail) === currentUserEmail
+  );
+};
+
 const buildSeats = (flightScheduleId, fareClass) => {
   const rowsByClass = {
     FIRST: [1, 2],
@@ -471,14 +581,15 @@ const createBooking = (request) => {
   }));
   const passengerCount = Math.max(passengers.length, 1);
   const now = new Date().toISOString().slice(0, 19);
+  const currentUser = getDemoProfile();
   const booking = {
     id: Date.now(),
     bookingReference: `SKY${Math.random()
       .toString(36)
       .slice(2, 10)
       .toUpperCase()}`,
-    userId: 1,
-    userEmail: getDemoProfile().email,
+    userId: currentUser.id,
+    userEmail: normalizeDemoEmail(currentUser.email),
     flightScheduleId:
       selectedBooking?.flightScheduleId || Number(request.flightScheduleId),
     flightNumber: selectedBooking?.flightNumber || "SL 221",
@@ -586,22 +697,50 @@ export const demoAdapter = async (config) => {
   }
 
   if (method === "post" && path === "/auth/login/otp/send") {
+    const otp = issueDemoOtp(body.email, "LOGIN");
+
     return demoResponse(config, {
-      message: "Demo OTP sent. Use any OTP value to continue.",
+      message: "Demo OTP generated.",
+      demoOtp: otp.code,
+      expiresAt: otp.expiresAt,
     });
   }
 
   if (method === "post" && path === "/auth/login/otp/verify") {
+    const result = verifyDemoOtp(
+      body.identifier,
+      body.otpPurpose || "LOGIN",
+      body.otpCode
+    );
+
+    if (!result.verified) {
+      return demoError(config, result.message, 400);
+    }
+
     return demoResponse(config, loginResponse(body.identifier));
   }
 
   if (method === "post" && path === "/otp/send") {
+    const otp = issueDemoOtp(body.identifier, body.otpPurpose);
+
     return demoResponse(config, {
-      message: "Demo OTP sent. Use any OTP value to continue.",
+      message: "Demo OTP generated.",
+      demoOtp: otp.code,
+      expiresAt: otp.expiresAt,
     });
   }
 
   if (method === "post" && path === "/otp/verify") {
+    const result = verifyDemoOtp(
+      body.identifier,
+      body.otpPurpose,
+      body.otpCode
+    );
+
+    if (!result.verified) {
+      return demoError(config, result.message, 400);
+    }
+
     return demoResponse(config, {
       verified: true,
       message: "Demo OTP verified.",
@@ -633,7 +772,7 @@ export const demoAdapter = async (config) => {
   }
 
   if (method === "get" && path === "/bookings/my") {
-    return demoResponse(config, getDemoBookings());
+    return demoResponse(config, getCurrentUserDemoBookings());
   }
 
   const cancelMatch = path.match(/^\/bookings\/([^/]+)\/cancel$/);
@@ -641,8 +780,11 @@ export const demoAdapter = async (config) => {
   if (method === "post" && cancelMatch) {
     const bookingReference = decodeURIComponent(cancelMatch[1]);
     const bookings = getDemoBookings();
+    const currentUserEmail = getCurrentDemoUserEmail();
     const bookingIndex = bookings.findIndex(
-      (booking) => booking.bookingReference === bookingReference
+      (booking) =>
+        booking.bookingReference === bookingReference &&
+        normalizeDemoEmail(booking.userEmail) === currentUserEmail
     );
 
     if (bookingIndex === -1) {

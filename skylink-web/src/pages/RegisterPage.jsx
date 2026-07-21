@@ -41,6 +41,7 @@ function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [otpCode, setOtpCode] = useState("");
+  const [demoOtp, setDemoOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [loadingAction, setLoadingAction] = useState("");
@@ -66,6 +67,7 @@ function RegisterPage() {
     setOtpSent(false);
     setOtpVerified(false);
     setOtpCode("");
+    setDemoOtp("");
   };
 
   const sendOtp = async () => {
@@ -79,15 +81,22 @@ function RegisterPage() {
     setMessage("");
 
     try {
-      await api.post("/otp/send", {
+      const response = await api.post("/otp/send", {
         identifier: normalizedEmail,
         otpType: "EMAIL",
         otpPurpose: "REGISTRATION",
       });
+      const generatedDemoOtp = response.data?.demoOtp || "";
 
       setOtpSent(true);
       setOtpVerified(false);
-      setMessage("Registration OTP email par bhej diya gaya hai.");
+      setOtpCode("");
+      setDemoOtp(generatedDemoOtp);
+      setMessage(
+        generatedDemoOtp
+          ? "Demo OTP neeche generate ho gaya hai. Yeh 5 minutes tak valid hai."
+          : "Registration OTP email par bhej diya gaya hai."
+      );
     } catch (requestError) {
       setError(
         getApiErrorMessage(
@@ -119,6 +128,7 @@ function RegisterPage() {
       });
 
       setOtpVerified(true);
+      setDemoOtp("");
       setMessage("Email OTP verified. Account create kar sakte hain.");
     } catch (requestError) {
       setError(
@@ -350,6 +360,26 @@ function RegisterPage() {
                   >
                     Resend OTP
                   </button>
+                )}
+
+                {demoOtp && otpSent && !otpVerified && (
+                  <div className="demo-otp-card" role="status">
+                    <div>
+                      <span>Demo OTP</span>
+                      <strong>{demoOtp}</strong>
+                      <small>5 minutes valid - isi browser session ke liye</small>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtpCode(demoOtp);
+                        setError("");
+                      }}
+                    >
+                      Use code
+                    </button>
+                  </div>
                 )}
               </div>
             )}

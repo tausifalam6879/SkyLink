@@ -30,7 +30,7 @@ The GitHub Pages deployment cannot run Java or MySQL. For that reason, the hoste
 | --- | --- | --- |
 | Airport search | Static airport JSON | MySQL airport data |
 | Flight search | Generated sample flights | Spring Boot search and schedule generation |
-| Login and OTP | Demo credentials; any OTP | BCrypt, signed JWT, and SMTP email |
+| Login and OTP | On-screen, expiring demo OTP | BCrypt, signed JWT, and SMTP email |
 | Seats | Browser-generated seat map | Database-backed seat inventory |
 | Bookings | Saved in `localStorage` | Saved in MySQL for the authenticated user |
 | Cancellation | Updates browser data | Releases seats and restores fare inventory |

@@ -38,6 +38,7 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otpCode, setOtpCode] = useState("");
+  const [demoOtp, setDemoOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -90,12 +91,19 @@ function LoginPage() {
     setMessage("");
 
     try {
-      await api.post("/auth/login/otp/send", {
+      const response = await api.post("/auth/login/otp/send", {
         email: normalizedEmail,
       });
+      const generatedDemoOtp = response.data?.demoOtp || "";
 
       setOtpSent(true);
-      setMessage("Login OTP email par bhej diya gaya hai.");
+      setOtpCode("");
+      setDemoOtp(generatedDemoOtp);
+      setMessage(
+        generatedDemoOtp
+          ? "Demo OTP neeche generate ho gaya hai. Yeh 5 minutes tak valid hai."
+          : "Login OTP email par bhej diya gaya hai."
+      );
     } catch (requestError) {
       setError(
         getApiErrorMessage(
@@ -111,6 +119,7 @@ function LoginPage() {
   const resetOtpState = () => {
     setOtpSent(false);
     setOtpCode("");
+    setDemoOtp("");
   };
 
   const verifyLoginOtp = async () => {
@@ -337,6 +346,26 @@ function LoginPage() {
                   >
                     Resend OTP
                   </button>
+                )}
+
+                {demoOtp && otpSent && (
+                  <div className="demo-otp-card" role="status">
+                    <div>
+                      <span>Demo OTP</span>
+                      <strong>{demoOtp}</strong>
+                      <small>5 minutes valid - isi browser session ke liye</small>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtpCode(demoOtp);
+                        setError("");
+                      }}
+                    >
+                      Use code
+                    </button>
+                  </div>
                 )}
               </div>
             )}

@@ -2953,6 +2953,59 @@ button:disabled {
   font-size: 12px;
 }
 
+.demo-otp-card {
+  margin-top: 12px;
+  padding: 13px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid #b9d8ff;
+  border-radius: 10px;
+  background: #eef6ff;
+}
+
+.demo-otp-card > div {
+  display: grid;
+  gap: 3px;
+}
+
+.demo-otp-card span {
+  color: #52647c;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.demo-otp-card strong {
+  color: #075fcf;
+  font-size: 24px;
+  letter-spacing: 0.18em;
+}
+
+.demo-otp-card small {
+  color: #64758c;
+  font-size: 11px;
+}
+
+.demo-otp-card button {
+  min-height: 38px;
+  padding: 0 15px;
+  flex: 0 0 auto;
+  border: 1px solid #0967e8;
+  border-radius: 8px;
+  color: #0967e8;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.demo-otp-card button:hover {
+  color: #ffffff;
+  background: #0967e8;
+}
+
 .login-success {
   margin: 18px 0;
   padding: 13px 15px;
@@ -4562,6 +4615,11 @@ button:disabled {
   .register-otp-row,
   .profile-detail-list > div {
     grid-template-columns: 1fr;
+  }
+
+  .demo-otp-card {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .offers-page-shell,
