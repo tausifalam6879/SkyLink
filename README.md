@@ -43,7 +43,7 @@ The demo is useful for reviewing the UI. The local setup is the actual client-se
 2. Choose a travel date and search for flights.
 3. Compare available fare classes and select a flight.
 4. Log in with a password or email OTP.
-5. Choose a seat and enter passenger details.
+5. Enter details and choose a separate seat for every traveller.
 6. Create the booking and receive a booking reference.
 7. Review or cancel the booking from **My Bookings**.
 
@@ -264,7 +264,6 @@ The current backend test uses an H2 in-memory database and checks that the Sprin
 
 The repository is a working project, but it is not presented as a production airline system. The current boundaries are:
 
-- the booking page submits one passenger even though traveller count is available in search;
 - round-trip selection stores a return date but only the outbound flight is searched;
 - the real backend supports `ECONOMY`, `BUSINESS`, and `FIRST_CLASS`; the hosted demo also shows a premium-economy option;
 - flight status, trip planning, group-booking requests, and fare alerts are frontend demonstrations;

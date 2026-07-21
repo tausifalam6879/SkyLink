@@ -947,6 +947,15 @@ function HomePage() {
     flight,
     fare
   ) => {
+    if (
+      fare.availableSeats < totalTravellers
+    ) {
+      setError(
+        `Only ${fare.availableSeats} seats are available for this fare. Please reduce the traveller count or choose another fare.`
+      );
+      return;
+    }
+
     const selectedBooking = {
       flightScheduleId:
         flight.flightScheduleId,
@@ -2073,6 +2082,16 @@ function HomePage() {
 
                           <button
                             type="button"
+                            disabled={
+                              fare.availableSeats <
+                              totalTravellers
+                            }
+                            title={
+                              fare.availableSeats <
+                              totalTravellers
+                                ? `Only ${fare.availableSeats} seats are available for ${totalTravellers} travellers`
+                                : "Continue to passenger details"
+                            }
                             onClick={() =>
                               handleFareSelection(
                                 flight,
@@ -2080,7 +2099,10 @@ function HomePage() {
                               )
                             }
                           >
-                            Select
+                            {fare.availableSeats <
+                            totalTravellers
+                              ? "Not enough seats"
+                              : "Select"}
                           </button>
                         </div>
                       </div>

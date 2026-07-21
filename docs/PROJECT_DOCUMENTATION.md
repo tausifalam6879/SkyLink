@@ -274,7 +274,7 @@ Running the real system publicly would additionally require:
 
 The following items are deliberately described as unfinished rather than implied by the UI:
 
-- multi-passenger and round-trip booking;
+- round-trip booking;
 - payment, refunds, ticket documents, and confirmation emails;
 - admin authorization and an inventory-management interface;
 - real flight-status data;

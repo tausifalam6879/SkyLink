@@ -12,6 +12,12 @@ import api from "../api/axiosConfig";
 const SELECTED_BOOKING_KEY =
   "skylink_selected_booking";
 
+const travellerLabels = {
+  ADULT: "Adult",
+  CHILD: "Child",
+  INFANT: "Infant",
+};
+
 const getStoredSelectedBooking = () => {
   const storedBooking =
     localStorage.getItem(
@@ -33,35 +39,79 @@ const getStoredSelectedBooking = () => {
   }
 };
 
+const normalizeTravellerCount = (
+  value,
+  fallback = 0
+) => {
+  const parsedValue = Number(value);
+
+  if (!Number.isFinite(parsedValue)) {
+    return fallback;
+  }
+
+  return Math.max(
+    0,
+    Math.floor(parsedValue)
+  );
+};
+
+const getRequestedPassengerTypes = (
+  selectedBooking
+) => {
+  const requestedTravellers =
+    selectedBooking?.requestedTravellers || {};
+  const adultCount = Math.max(
+    1,
+    normalizeTravellerCount(
+      requestedTravellers.adults,
+      1
+    )
+  );
+  const childCount = normalizeTravellerCount(
+    requestedTravellers.children
+  );
+  const infantCount = normalizeTravellerCount(
+    requestedTravellers.infants
+  );
+
+  return [
+    ...Array(adultCount).fill("ADULT"),
+    ...Array(childCount).fill("CHILD"),
+    ...Array(infantCount).fill("INFANT"),
+  ];
+};
+
+const createPassengerForm = (
+  travellerType
+) => ({
+  travellerType,
+  firstName: "",
+  lastName: "",
+  dateOfBirth: "",
+  gender: "MALE",
+  passportNumber: "",
+  nationality: "INDIAN",
+  seatNumber: "",
+});
+
 function BookingPage() {
   const navigate = useNavigate();
 
   const [selectedBooking] =
     useState(getStoredSelectedBooking);
 
-  const [firstName, setFirstName] =
-    useState("");
+  const [passengers, setPassengers] =
+    useState(() =>
+      getRequestedPassengerTypes(
+        selectedBooking
+      ).map(createPassengerForm)
+    );
 
-  const [lastName, setLastName] =
-    useState("");
-
-  const [dateOfBirth, setDateOfBirth] =
-    useState("");
-
-  const [gender, setGender] =
-    useState("MALE");
-
-  const [passportNumber, setPassportNumber] =
-    useState("");
-
-  const [nationality, setNationality] =
-    useState("INDIAN");
+  const [activePassengerIndex, setActivePassengerIndex] =
+    useState(0);
 
   const [seats, setSeats] =
     useState([]);
-
-  const [selectedSeatNumber, setSelectedSeatNumber] =
-    useState("");
 
   const [seatLoading, setSeatLoading] =
     useState(false);
@@ -74,6 +124,17 @@ function BookingPage() {
 
   const [confirmedBooking, setConfirmedBooking] =
     useState(null);
+
+  const passengerCount = passengers.length;
+  const selectedSeatNumbers = passengers
+    .map((passenger) => passenger.seatNumber)
+    .filter(Boolean);
+  const allSeatsSelected = passengers.every(
+    (passenger) => Boolean(passenger.seatNumber)
+  );
+  const bookingTotal =
+    Number(selectedBooking?.baseFare || 0) *
+    passengerCount;
 
   useEffect(() => {
     if (
@@ -154,6 +215,24 @@ function BookingPage() {
       );
   }, [seatsByRow]);
 
+  const updatePassenger = (
+    passengerIndex,
+    field,
+    value
+  ) => {
+    setPassengers((currentPassengers) =>
+      currentPassengers.map(
+        (passenger, index) =>
+          index === passengerIndex
+            ? {
+                ...passenger,
+                [field]: value,
+              }
+            : passenger
+      )
+    );
+  };
+
   const createBooking = async (event) => {
     event.preventDefault();
 
@@ -161,9 +240,20 @@ function BookingPage() {
       return;
     }
 
-    if (!selectedSeatNumber) {
+    if (!allSeatsSelected) {
       setError(
-        "Please select a seat before confirming your booking."
+        "Please select one seat for every passenger before confirming your booking."
+      );
+
+      return;
+    }
+
+    if (
+      new Set(selectedSeatNumbers).size !==
+      passengerCount
+    ) {
+      setError(
+        "Each passenger must have a different seat."
       );
 
       return;
@@ -182,34 +272,35 @@ function BookingPage() {
           fareClass:
             selectedBooking.fareClass,
 
-          passengers: [
-            {
+          passengers: passengers.map(
+            (passenger) => ({
               firstName:
-                firstName.trim(),
+                passenger.firstName.trim(),
 
               lastName:
-                lastName.trim(),
+                passenger.lastName.trim(),
 
-              dateOfBirth,
+              dateOfBirth:
+                passenger.dateOfBirth,
 
-              gender,
+              gender: passenger.gender,
 
               passportNumber:
-                passportNumber.trim()
-                  ? passportNumber
+                passenger.passportNumber.trim()
+                  ? passenger.passportNumber
                       .trim()
                       .toUpperCase()
                   : null,
 
               nationality:
-                nationality
+                passenger.nationality
                   .trim()
                   .toUpperCase(),
 
               seatNumber:
-                selectedSeatNumber,
-            },
-          ],
+                passenger.seatNumber,
+            })
+          ),
         }
       );
 
@@ -245,11 +336,74 @@ function BookingPage() {
       return;
     }
 
-    setSelectedSeatNumber(
-      seat.seatNumber
+    const assignedPassengerIndex =
+      passengers.findIndex(
+        (passenger) =>
+          passenger.seatNumber ===
+          seat.seatNumber
+      );
+
+    if (
+      assignedPassengerIndex !== -1 &&
+      assignedPassengerIndex !==
+        activePassengerIndex
+    ) {
+      setError(
+        `Seat ${seat.seatNumber} is already assigned to Passenger ${
+          assignedPassengerIndex + 1
+        }.`
+      );
+
+      return;
+    }
+
+    const nextPassengers = passengers.map(
+      (passenger, index) =>
+        index === activePassengerIndex
+          ? {
+              ...passenger,
+              seatNumber:
+                assignedPassengerIndex ===
+                activePassengerIndex
+                  ? ""
+                  : seat.seatNumber,
+            }
+          : passenger
     );
 
+    setPassengers(nextPassengers);
     setError("");
+
+    if (
+      assignedPassengerIndex ===
+      activePassengerIndex
+    ) {
+      return;
+    }
+
+    const nextPassengerIndex =
+      nextPassengers.findIndex(
+        (passenger, index) =>
+          index > activePassengerIndex &&
+          !passenger.seatNumber
+      );
+    const firstUnassignedPassengerIndex =
+      nextPassengers.findIndex(
+        (passenger) =>
+          !passenger.seatNumber
+      );
+
+    if (nextPassengerIndex !== -1) {
+      setActivePassengerIndex(
+        nextPassengerIndex
+      );
+    } else if (
+      firstUnassignedPassengerIndex !== -1
+    ) {
+      setActivePassengerIndex(
+        firstUnassignedPassengerIndex
+      );
+    }
   };
 
   const getSeatByLetter = (
@@ -281,9 +435,14 @@ function BookingPage() {
       );
     }
 
+    const assignedPassengerIndex =
+      passengers.findIndex(
+        (passenger) =>
+          passenger.seatNumber ===
+          seat.seatNumber
+      );
     const selected =
-      selectedSeatNumber ===
-      seat.seatNumber;
+      assignedPassengerIndex !== -1;
 
     const unavailable =
       seat.booked ||
@@ -314,7 +473,11 @@ function BookingPage() {
           selectSeat(seat)
         }
         title={
-          unavailable
+          assignedPassengerIndex !== -1
+            ? `${seat.seatNumber} - Passenger ${
+                assignedPassengerIndex + 1
+              }`
+            : unavailable
             ? `${seat.seatNumber} is unavailable`
             : `${seat.seatNumber}${
                 seat.windowSeat
@@ -485,10 +648,19 @@ function BookingPage() {
               </div>
 
               <div>
-                <span>Seat</span>
+                <span>Seats</span>
 
                 <strong>
-                  {selectedSeatNumber}
+                  {(
+                    confirmedBooking.passengers ||
+                    passengers
+                  )
+                    .map(
+                      (passenger) =>
+                        passenger.seatNumber
+                    )
+                    .filter(Boolean)
+                    .join(", ")}
                 </strong>
               </div>
 
@@ -584,139 +756,187 @@ function BookingPage() {
             className="passenger-form-card"
             onSubmit={createBooking}
           >
-            <div className="passenger-card-heading">
-              <div>
-                <UserRound size={21} />
-              </div>
+            {passengers.map(
+              (passenger, passengerIndex) => {
+                const passengerNumber =
+                  passengerIndex + 1;
+                const travellerLabel =
+                  travellerLabels[
+                    passenger.travellerType
+                  ];
 
-              <div>
-                <span>PASSENGER 1</span>
+                return (
+                  <section
+                    className="passenger-details-section"
+                    key={passengerNumber}
+                  >
+                    <div className="passenger-card-heading">
+                      <div>
+                        <UserRound size={21} />
+                      </div>
 
-                <h3>
-                  Primary passenger
-                </h3>
-              </div>
-            </div>
+                      <div>
+                        <span>
+                          PASSENGER {passengerNumber}
+                          {" - "}
+                          {travellerLabel.toUpperCase()}
+                        </span>
 
-            <div className="passenger-form-grid">
-              <div className="booking-input-group">
-                <label htmlFor="firstName">
-                  First name
-                </label>
+                        <h3>
+                          {passengerIndex === 0
+                            ? "Primary passenger"
+                            : `${travellerLabel} passenger`}
+                        </h3>
+                      </div>
+                    </div>
 
-                <input
-                  id="firstName"
-                  value={firstName}
-                  onChange={(event) =>
-                    setFirstName(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Md"
-                  required
-                />
-              </div>
+                    <div className="passenger-form-grid">
+                      <div className="booking-input-group">
+                        <label
+                          htmlFor={`firstName-${passengerIndex}`}
+                        >
+                          First name
+                        </label>
 
-              <div className="booking-input-group">
-                <label htmlFor="lastName">
-                  Last name
-                </label>
+                        <input
+                          id={`firstName-${passengerIndex}`}
+                          value={passenger.firstName}
+                          onChange={(event) =>
+                            updatePassenger(
+                              passengerIndex,
+                              "firstName",
+                              event.target.value
+                            )
+                          }
+                          placeholder="First name"
+                          required
+                        />
+                      </div>
 
-                <input
-                  id="lastName"
-                  value={lastName}
-                  onChange={(event) =>
-                    setLastName(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Tausif"
-                  required
-                />
-              </div>
+                      <div className="booking-input-group">
+                        <label
+                          htmlFor={`lastName-${passengerIndex}`}
+                        >
+                          Last name
+                        </label>
 
-              <div className="booking-input-group">
-                <label htmlFor="dateOfBirth">
-                  Date of birth
-                </label>
+                        <input
+                          id={`lastName-${passengerIndex}`}
+                          value={passenger.lastName}
+                          onChange={(event) =>
+                            updatePassenger(
+                              passengerIndex,
+                              "lastName",
+                              event.target.value
+                            )
+                          }
+                          placeholder="Last name"
+                          required
+                        />
+                      </div>
 
-                <input
-                  id="dateOfBirth"
-                  type="date"
-                  value={dateOfBirth}
-                  onChange={(event) =>
-                    setDateOfBirth(
-                      event.target.value
-                    )
-                  }
-                  required
-                />
-              </div>
+                      <div className="booking-input-group">
+                        <label
+                          htmlFor={`dateOfBirth-${passengerIndex}`}
+                        >
+                          Date of birth
+                        </label>
 
-              <div className="booking-input-group">
-                <label htmlFor="gender">
-                  Gender
-                </label>
+                        <input
+                          id={`dateOfBirth-${passengerIndex}`}
+                          type="date"
+                          value={passenger.dateOfBirth}
+                          onChange={(event) =>
+                            updatePassenger(
+                              passengerIndex,
+                              "dateOfBirth",
+                              event.target.value
+                            )
+                          }
+                          required
+                        />
+                      </div>
 
-                <select
-                  id="gender"
-                  value={gender}
-                  onChange={(event) =>
-                    setGender(
-                      event.target.value
-                    )
-                  }
-                  required
-                >
-                  <option value="MALE">
-                    Male
-                  </option>
+                      <div className="booking-input-group">
+                        <label
+                          htmlFor={`gender-${passengerIndex}`}
+                        >
+                          Gender
+                        </label>
 
-                  <option value="FEMALE">
-                    Female
-                  </option>
+                        <select
+                          id={`gender-${passengerIndex}`}
+                          value={passenger.gender}
+                          onChange={(event) =>
+                            updatePassenger(
+                              passengerIndex,
+                              "gender",
+                              event.target.value
+                            )
+                          }
+                          required
+                        >
+                          <option value="MALE">
+                            Male
+                          </option>
 
-                  <option value="OTHER">
-                    Other
-                  </option>
-                </select>
-              </div>
+                          <option value="FEMALE">
+                            Female
+                          </option>
 
-              <div className="booking-input-group">
-                <label htmlFor="nationality">
-                  Nationality
-                </label>
+                          <option value="OTHER">
+                            Other
+                          </option>
+                        </select>
+                      </div>
 
-                <input
-                  id="nationality"
-                  value={nationality}
-                  onChange={(event) =>
-                    setNationality(
-                      event.target.value
-                    )
-                  }
-                  placeholder="INDIAN"
-                  required
-                />
-              </div>
+                      <div className="booking-input-group">
+                        <label
+                          htmlFor={`nationality-${passengerIndex}`}
+                        >
+                          Nationality
+                        </label>
 
-              <div className="booking-input-group">
-                <label htmlFor="passportNumber">
-                  Passport number
-                </label>
+                        <input
+                          id={`nationality-${passengerIndex}`}
+                          value={passenger.nationality}
+                          onChange={(event) =>
+                            updatePassenger(
+                              passengerIndex,
+                              "nationality",
+                              event.target.value
+                            )
+                          }
+                          placeholder="INDIAN"
+                          required
+                        />
+                      </div>
 
-                <input
-                  id="passportNumber"
-                  value={passportNumber}
-                  onChange={(event) =>
-                    setPassportNumber(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Optional"
-                />
-              </div>
-            </div>
+                      <div className="booking-input-group">
+                        <label
+                          htmlFor={`passportNumber-${passengerIndex}`}
+                        >
+                          Passport number
+                        </label>
+
+                        <input
+                          id={`passportNumber-${passengerIndex}`}
+                          value={passenger.passportNumber}
+                          onChange={(event) =>
+                            updatePassenger(
+                              passengerIndex,
+                              "passportNumber",
+                              event.target.value
+                            )
+                          }
+                          placeholder="Optional"
+                        />
+                      </div>
+                    </div>
+                  </section>
+                );
+              }
+            )}
 
             <div className="seat-selection-section">
               <div className="seat-selection-heading">
@@ -731,8 +951,64 @@ function BookingPage() {
 
                 <p>
                   Choose one available seat for
-                  this passenger.
+                  each of the {passengerCount}
+                  {" "}passengers.
                 </p>
+              </div>
+
+              <div
+                className="passenger-seat-tabs"
+                role="tablist"
+                aria-label="Choose passenger for seat assignment"
+              >
+                {passengers.map(
+                  (passenger, passengerIndex) => (
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={
+                        activePassengerIndex ===
+                        passengerIndex
+                      }
+                      className={
+                        activePassengerIndex ===
+                        passengerIndex
+                          ? "active"
+                          : ""
+                      }
+                      key={passengerIndex}
+                      onClick={() => {
+                        setActivePassengerIndex(
+                          passengerIndex
+                        );
+                        setError("");
+                      }}
+                    >
+                      <span>
+                        Passenger {passengerIndex + 1}
+                      </span>
+
+                      <strong>
+                        {passenger.seatNumber ||
+                          "Choose seat"}
+                      </strong>
+                    </button>
+                  )
+                )}
+              </div>
+
+              <div className="active-seat-passenger">
+                Selecting seat for
+                <strong>
+                  Passenger {activePassengerIndex + 1}
+                  {" - "}
+                  {
+                    travellerLabels[
+                      passengers[activePassengerIndex]
+                        .travellerType
+                    ]
+                  }
+                </strong>
               </div>
 
               <div className="seat-legend">
@@ -832,14 +1108,15 @@ function BookingPage() {
                 </div>
               )}
 
-              {selectedSeatNumber && (
+              {selectedSeatNumbers.length > 0 && (
                 <div className="selected-seat-summary">
                   <span>
-                    SELECTED SEAT
+                    {selectedSeatNumbers.length}/
+                    {passengerCount} SEATS SELECTED
                   </span>
 
                   <strong>
-                    {selectedSeatNumber}
+                    {selectedSeatNumbers.join(", ")}
                   </strong>
                 </div>
               )}
@@ -857,16 +1134,27 @@ function BookingPage() {
               disabled={
                 loading ||
                 seatLoading ||
-                !selectedSeatNumber
+                !allSeatsSelected
               }
             >
               {loading
                 ? "Confirming booking..."
-                : selectedSeatNumber
-                  ? `Confirm Booking - Seat ${selectedSeatNumber} - ${formatPrice(
-                      selectedBooking.baseFare
+                : allSeatsSelected
+                  ? `Confirm Booking - ${passengerCount} Passenger${
+                      passengerCount === 1 ? "" : "s"
+                    } - ${formatPrice(
+                      bookingTotal
                     )}`
-                  : "Select a seat to continue"}
+                  : `Select ${
+                      passengerCount -
+                      selectedSeatNumbers.length
+                    } more seat${
+                      passengerCount -
+                        selectedSeatNumbers.length ===
+                      1
+                        ? ""
+                        : "s"
+                    } to continue`}
             </button>
           </form>
 
@@ -954,31 +1242,44 @@ function BookingPage() {
                 </span>
 
                 <small>
-                  1 passenger
+                  {passengerCount} passenger
+                  {passengerCount === 1
+                    ? ""
+                    : "s"}
+                  {" × "}
+                  {formatPrice(
+                    selectedBooking.baseFare
+                  )}
                 </small>
               </div>
 
               <strong>
                 {formatPrice(
-                  selectedBooking.baseFare
+                  bookingTotal
                 )}
               </strong>
             </div>
 
-            {selectedSeatNumber && (
-              <div className="summary-price-row">
-                <div>
-                  <span>Selected seat</span>
+            {passengers.map(
+              (passenger, passengerIndex) =>
+                passenger.seatNumber ? (
+                  <div
+                    className="summary-price-row"
+                    key={passengerIndex}
+                  >
+                    <div>
+                      <span>Selected seat</span>
 
-                  <small>
-                    Passenger 1
-                  </small>
-                </div>
+                      <small>
+                        Passenger {passengerIndex + 1}
+                      </small>
+                    </div>
 
-                <strong>
-                  {selectedSeatNumber}
-                </strong>
-              </div>
+                    <strong>
+                      {passenger.seatNumber}
+                    </strong>
+                  </div>
+                ) : null
             )}
 
             <div className="summary-total">
@@ -986,7 +1287,7 @@ function BookingPage() {
 
               <strong>
                 {formatPrice(
-                  selectedBooking.baseFare
+                  bookingTotal
                 )}
               </strong>
             </div>
